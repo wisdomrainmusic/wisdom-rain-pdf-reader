@@ -120,8 +120,3 @@ class WRPR_Admin_Readers {
     }
 }
 
-if ( isset($_GET['page']) && $_GET['page'] === 'wrpr-edit' && isset($_GET['reader_id']) ) {
-    require_once WRPR_PATH . 'includes/wrpr-admin-edit.php';
-    WRPR_Admin_Edit::render_edit_page( sanitize_text_field($_GET['reader_id']) );
-    return;
-}
