@@ -77,10 +77,8 @@ class WRPR_Admin {
      * @return void
      */
     public static function render_manage_readers() {
-        echo '<div class="wrap">';
-        echo '<h2>' . esc_html__( 'Manage Readers', 'wrpr' ) . '</h2>';
-        echo '<p>' . esc_html__( 'Reader management module will load here.', 'wrpr' ) . '</p>';
-        echo '</div>';
+        require_once WRPR_PATH . 'includes/wrpr-admin-readers.php';
+        WRPR_Admin_Readers::render_page();
     }
 
     /**
@@ -89,7 +87,6 @@ class WRPR_Admin {
      * @return void
      */
     public static function render_manage_categories() {
-        require_once WRPR_PATH . 'includes/wrpr-admin-categories.php';
         WRPR_Admin_Categories::render_page();
     }
 
