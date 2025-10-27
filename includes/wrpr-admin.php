@@ -7,6 +7,8 @@ if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
+require_once WRPR_PATH . 'includes/wrpr-admin-categories.php';
+
 class WRPR_Admin {
 
     /**
@@ -87,10 +89,8 @@ class WRPR_Admin {
      * @return void
      */
     public static function render_manage_categories() {
-        echo '<div class="wrap">';
-        echo '<h2>' . esc_html__( 'Manage Categories', 'wrpr' ) . '</h2>';
-        echo '<p>' . esc_html__( 'Category management module will load here.', 'wrpr' ) . '</p>';
-        echo '</div>';
+        require_once WRPR_PATH . 'includes/wrpr-admin-categories.php';
+        WRPR_Admin_Categories::render_page();
     }
 
     /**
