@@ -13,9 +13,17 @@ class WRPR_Admin_Edit {
             return;
         }
 
-        $reader     = $readers[ $reader_id ];
-        $books      = isset( $reader['books'] ) ? $reader['books'] : array();
-        $categories = WRPR_Admin_Categories::get_categories();
+        $reader        = $readers[ $reader_id ];
+        $books         = isset( $reader['books'] ) ? $reader['books'] : array();
+        $categories    = WRPR_Admin_Categories::get_categories();
+        $default_book  = array(
+            'title'     => '',
+            'author'    => '',
+            'language'  => '',
+            'image_url' => '',
+            'pdf_url'   => '',
+            'buy_link'  => '',
+        );
 
         // Save updates
         if ( isset( $_POST['wrpr_update_books'] ) ) {
@@ -59,39 +67,62 @@ class WRPR_Admin_Edit {
                 <th>Image URL</th><th>PDF URL</th><th>Buy Link</th><th>Delete</th>
               </tr></thead><tbody>';
 
-        $row_count = max( count( $books ), 1 );
+        $row_count = count( $books );
 
-        for ( $i = 0; $i < $row_count + 1; $i++ ) {
-            $book = $books[ $i ] ?? array(
-                'title'     => '',
-                'author'    => '',
-                'language'  => '',
-                'image_url' => '',
-                'pdf_url'   => '',
-                'buy_link'  => '',
-            );
-
-            echo '<tr>';
-            echo '<td><input type="text" name="book_title[]" value="' . esc_attr( $book['title'] ) . '" placeholder="Book title" /></td>';
-            echo '<td><input type="text" name="book_author[]" value="' . esc_attr( $book['author'] ) . '" placeholder="Author" /></td>';
-
-            echo '<td><select name="book_language[]">';
-            echo '<option value="">Select</option>';
-            foreach ( $categories as $cat ) {
-                $selected = selected( $book['language'], $cat['name'], false );
-                echo '<option value="' . esc_attr( $cat['name'] ) . '"' . $selected . '>' . esc_html( $cat['name'] ) . '</option>';
+        if ( 0 === $row_count ) {
+            self::render_book_row( $default_book, 0, $categories );
+        } else {
+            for ( $i = 0; $i < $row_count; $i++ ) {
+                $book = wp_parse_args( $books[ $i ], $default_book );
+                self::render_book_row( $book, $i, $categories );
             }
-            echo '</select></td>';
-
-            echo '<td><input type="text" name="book_image[]" value="' . esc_attr( $book['image_url'] ) . '" placeholder="Image URL" /></td>';
-            echo '<td><input type="text" name="book_pdf[]" value="' . esc_attr( $book['pdf_url'] ) . '" placeholder="PDF URL" /></td>';
-            echo '<td><input type="text" name="book_buy[]" value="' . esc_attr( $book['buy_link'] ) . '" placeholder="Buy Link" /></td>';
-            echo '<td><input type="checkbox" name="book_delete[' . $i . ']" /></td>';
-            echo '</tr>';
         }
 
         echo '</tbody></table>';
+        echo '<p><button type="button" id="wrpr-add-row" class="button">+ Add New Book</button></p>';
+        echo "<script>
+document.getElementById('wrpr-add-row').addEventListener('click', function(){
+    const table = document.querySelector('.widefat tbody');
+    if (!table || !table.rows.length) {
+        return;
+    }
+    const newRow = table.rows[0].cloneNode(true);
+    newRow.querySelectorAll('input').forEach(function(el){
+        if (el.type === 'checkbox') {
+            el.checked = false;
+            el.name = 'book_delete[' + table.rows.length + ']';
+        } else {
+            el.value = '';
+        }
+    });
+    const select = newRow.querySelector('select');
+    if (select) {
+        select.selectedIndex = 0;
+    }
+    table.appendChild(newRow);
+});
+</script>";
         echo '<p><input type="submit" class="button button-primary" name="wrpr_update_books" value="Update Reader Record" /></p>';
         echo '</form></div>';
+    }
+
+    private static function render_book_row( $book, $index, $categories ) {
+        echo '<tr>';
+        echo '<td><input type="text" name="book_title[]" value="' . esc_attr( $book['title'] ) . '" placeholder="Book title" /></td>';
+        echo '<td><input type="text" name="book_author[]" value="' . esc_attr( $book['author'] ) . '" placeholder="Author" /></td>';
+
+        echo '<td><select name="book_language[]">';
+        echo '<option value="">Select</option>';
+        foreach ( $categories as $cat ) {
+            $selected = selected( $book['language'], $cat['name'], false );
+            echo '<option value="' . esc_attr( $cat['name'] ) . '"' . $selected . '>' . esc_html( $cat['name'] ) . '</option>';
+        }
+        echo '</select></td>';
+
+        echo '<td><input type="text" name="book_image[]" value="' . esc_attr( $book['image_url'] ) . '" placeholder="Image URL" /></td>';
+        echo '<td><input type="text" name="book_pdf[]" value="' . esc_attr( $book['pdf_url'] ) . '" placeholder="PDF URL" /></td>';
+        echo '<td><input type="text" name="book_buy[]" value="' . esc_attr( $book['buy_link'] ) . '" placeholder="Buy Link" /></td>';
+        echo '<td><input type="checkbox" name="book_delete[' . absint( $index ) . ']" /></td>';
+        echo '</tr>';
     }
 }

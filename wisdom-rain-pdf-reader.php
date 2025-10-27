@@ -39,6 +39,7 @@ function wrpr_load_textdomain() {
 
 function wrpr_enqueue_assets() {
     wp_enqueue_script( 'pdfjs', 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js', array(), null, true );
+    wp_add_inline_script( 'pdfjs', 'pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";' );
     wp_enqueue_script( 'wrpr-renderer', plugin_dir_url( __FILE__ ) . 'assets/js/wrpr-renderer.js', array( 'pdfjs' ), null, true );
     wp_enqueue_style( 'wrpr-style', plugin_dir_url( __FILE__ ) . 'assets/css/wrpr-style.css' );
 }
