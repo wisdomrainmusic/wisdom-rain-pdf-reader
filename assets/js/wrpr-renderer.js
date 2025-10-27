@@ -121,4 +121,14 @@
   if (btnClose) {
     btnClose.addEventListener('click', hideModal);
   }
+
+  document
+    .querySelector('.wrpr-language-filter')
+    ?.addEventListener('change', (e) => {
+      const lang = e.target.value;
+      document.querySelectorAll('.wrpr-book-card').forEach((card) => {
+        const match = lang === 'All' || card.dataset.lang === lang;
+        card.style.display = match ? 'flex' : 'none';
+      });
+    });
 })();
