@@ -52,19 +52,21 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     function renderPage(num) {
-        if (!pdfDoc || !canvas || !ctx) {
-            return;
-        }
-
         pdfDoc.getPage(num).then(page => {
-            const viewport = page.getViewport({ scale: 1.2 });
+            const viewport = page.getViewport({ scale: 1.5 });
+            const canvas = document.getElementById('wrpr-canvas');
+            const ctx = canvas.getContext('2d');
             canvas.height = viewport.height;
             canvas.width = viewport.width;
 
             const renderContext = { canvasContext: ctx, viewport: viewport };
-            page.render(renderContext);
+            const renderTask = page.render(renderContext);
 
-            localStorage.setItem('wrpr_progress_' + readerId, num);
+            renderTask.promise.then(() => {
+                localStorage.setItem('wrpr_progress_' + readerId, num);
+            });
+        }).catch(err => {
+            console.error('PDF render error:', err);
         });
     }
 
