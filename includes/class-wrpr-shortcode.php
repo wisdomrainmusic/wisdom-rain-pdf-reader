@@ -99,7 +99,7 @@ class WRPR_Shortcode {
             <!-- PDF Modal -->
             <div id="wrpr-modal" style="display:none;">
                 <div id="wrpr-pdf-viewer">
-                    <canvas id="wrpr-canvas"></canvas>
+                    <div id="wrpr-pdf-container"></div>
                 </div>
                 <button id="wrpr-close">× Close</button>
             </div>
