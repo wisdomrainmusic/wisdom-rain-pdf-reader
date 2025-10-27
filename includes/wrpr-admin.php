@@ -53,6 +53,15 @@ class WRPR_Admin {
             'wrpr-manage-categories',
             array( __CLASS__, 'render_manage_categories' )
         );
+
+        add_submenu_page(
+            null,
+            __( 'Edit Books', 'wrpr' ),
+            __( 'Edit Books', 'wrpr' ),
+            'manage_options',
+            'wrpr-edit',
+            array( __CLASS__, 'render_edit_books' )
+        );
     }
 
     /**
@@ -88,6 +97,22 @@ class WRPR_Admin {
      */
     public static function render_manage_categories() {
         WRPR_Admin_Categories::render_page();
+    }
+
+    /**
+     * Render the hidden edit books page.
+     *
+     * @return void
+     */
+    public static function render_edit_books() {
+        require_once WRPR_PATH . 'includes/wrpr-admin-edit.php';
+
+        if ( isset( $_GET['reader_id'] ) ) {
+            WRPR_Admin_Edit::render_edit_page( sanitize_text_field( wp_unslash( $_GET['reader_id'] ) ) );
+            return;
+        }
+
+        echo '<div class="wrap"><h1>' . esc_html__( 'No Reader ID provided.', 'wrpr' ) . '</h1></div>';
     }
 
     /**
