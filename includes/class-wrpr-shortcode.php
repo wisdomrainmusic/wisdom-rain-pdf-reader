@@ -92,9 +92,9 @@ class WRPR_Shortcode {
                                     data-reader="<?php echo esc_attr( $reader_id ); ?>">
                                 Read PDF
                             </button>
-                            <?php if ( ! empty( $buy_link ) ) : ?>
-                                <a class="wrpr-buy-link" href="<?php echo esc_url( $buy_link ); ?>" target="_blank">Buy Now</a>
-                            <?php endif; ?>
+                            <a class="wrpr-buy-link"
+                               href="<?php echo esc_url( $buy_link ); ?>"
+                               target="_blank">Buy Now</a>
                         </div>
                     </div>
                 <?php endforeach; ?>
