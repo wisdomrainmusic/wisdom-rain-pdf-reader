@@ -60,16 +60,15 @@ class WRPR_Shortcode {
                 <h2><?php echo esc_html( $reader['name'] ); ?></h2>
                 <div class="wrpr-header-controls">
                     <select class="wrpr-language-filter">
-                        <option value="all">All Languages</option>
+                        <option value="All">All Languages</option>
                         <?php foreach ( $langs as $lang ) : ?>
                             <option value="<?php echo esc_attr( $lang ); ?>"><?php echo esc_html( $lang ); ?></option>
                         <?php endforeach; ?>
                     </select>
-                    <a href="#" class="wrpr-header-buy">🛒 Buy Now</a>
                 </div>
             </div>
 
-            <div class="wrpr-book-grid">
+            <div class="wrpr-book-list">
                 <?php foreach ( $books as $book ) :
                     $language = isset( $book['language'] ) ? $book['language'] : '';
                     $image    = isset( $book['image_url'] ) ? $book['image_url'] : '';
@@ -78,7 +77,7 @@ class WRPR_Shortcode {
                     $pdf_url  = isset( $book['pdf_url'] ) ? $book['pdf_url'] : '';
                     $buy_link = isset( $book['buy_link'] ) ? $book['buy_link'] : '';
                     ?>
-                    <div class="wrpr-book-card" data-language="<?php echo esc_attr( $language ); ?>">
+                    <div class="wrpr-book-card" data-lang="<?php echo esc_attr( $language ); ?>">
                         <div class="wrpr-cover">
                             <img src="<?php echo esc_url( $image ); ?>" alt="<?php echo esc_attr( $title ); ?>">
                         </div>

@@ -32,34 +32,40 @@
   padding: 6px 14px;
   text-decoration: none;
 }
-.wrpr-book-grid {
+.wrpr-book-list {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 1rem;
 }
 .wrpr-book-card {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  padding: 1rem;
   background: #fff;
-  border-radius: 14px;
-  box-shadow: 0 4px 10px rgba(0,0,0,0.06);
-  padding: 12px 16px;
-  transition: transform 0.15s ease;
+  border-radius: 16px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+  transition: all 0.3s ease;
 }
 .wrpr-book-card:hover {
   transform: scale(1.01);
 }
-.wrpr-cover img {
-  width: 80px;
-  height: 80px;
+.wrpr-book-card img {
+  width: 90px;
+  height: 90px;
+  border-radius: 12px;
   object-fit: cover;
-  border-radius: 10px;
-  margin-right: 20px;
+}
+.wrpr-book-card .wrpr-actions {
+  display: flex;
+  gap: 10px;
 }
 .wrpr-info {
   flex: 1;
   text-align: left;
+}
+.wrpr-cover {
+  margin-right: 1rem;
 }
 .wrpr-info h4 {
   font-size: 17px;
@@ -98,6 +104,7 @@
   justify-content: center;
   padding-top: 40px;
   overflow-y: auto;
+  animation: wrprFade 0.3s ease;
 }
 #wrpr-pdf-viewer {
   background: #fff;
@@ -118,4 +125,18 @@
   height: 36px;
   font-size: 20px;
   cursor: pointer;
+}
+
+#wrpr-modal canvas {
+  width: 90% !important;
+  max-width: 800px;
+  margin: 0 auto;
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.15);
+}
+
+@keyframes wrprFade {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
 }
