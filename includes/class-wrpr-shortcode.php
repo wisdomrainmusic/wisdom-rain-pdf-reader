@@ -40,28 +40,33 @@ class WRPR_Shortcode {
         wp_enqueue_script( 'wrpr-renderer' );
         wp_enqueue_style( 'wrpr-style' );
 
+        $langs = array();
+        foreach ( $books as $book ) {
+            $language = isset( $book['language'] ) ? $book['language'] : '';
+
+            if ( '' === $language ) {
+                continue;
+            }
+
+            if ( ! in_array( $language, $langs, true ) ) {
+                $langs[] = $language;
+            }
+        }
+
         ob_start();
         ?>
         <div class="wrpr-reader-wrapper" data-reader-id="<?php echo esc_attr( $reader_id ); ?>">
             <div class="wrpr-header">
                 <h2><?php echo esc_html( $reader['name'] ); ?></h2>
-                <select class="wrpr-language-filter">
-                    <option value="all">All Languages</option>
-                    <?php
-                    $langs = array();
-                    foreach ( $books as $book ) {
-                        $language = isset( $book['language'] ) ? $book['language'] : '';
-                        if ( '' === $language ) {
-                            continue;
-                        }
-
-                        if ( ! in_array( $language, $langs, true ) ) {
-                            $langs[] = $language;
-                            echo '<option value="' . esc_attr( $language ) . '">' . esc_html( $language ) . '</option>';
-                        }
-                    }
-                    ?>
-                </select>
+                <div class="wrpr-header-controls">
+                    <select class="wrpr-language-filter">
+                        <option value="all">All Languages</option>
+                        <?php foreach ( $langs as $lang ) : ?>
+                            <option value="<?php echo esc_attr( $lang ); ?>"><?php echo esc_html( $lang ); ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                    <a href="#" class="wrpr-header-buy">🛒 Buy Now</a>
+                </div>
             </div>
 
             <div class="wrpr-book-grid">
@@ -80,6 +85,8 @@ class WRPR_Shortcode {
                         <div class="wrpr-info">
                             <h4><?php echo esc_html( $title ); ?></h4>
                             <p><?php echo esc_html( $author ); ?></p>
+                        </div>
+                        <div class="wrpr-actions">
                             <button class="wrpr-open-btn" data-pdf="<?php echo esc_url( $pdf_url ); ?>">Read PDF</button>
                             <?php if ( ! empty( $buy_link ) ) : ?>
                                 <a href="<?php echo esc_url( $buy_link ); ?>" target="_blank" class="wrpr-buy-link">Buy Now</a>
