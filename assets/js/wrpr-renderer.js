@@ -1,113 +1,132 @@
-if (!window.pdfjsLib) {
-    window.pdfjsLib = pdfjsLib = window['pdfjs-dist/build/pdf'];
-    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
-}
+(function () {
+  // PDF.js global init (tek kez)
+  if (typeof window.pdfjsLib !== 'undefined') {
+    // already loaded
+  } else if (typeof window['pdfjs-dist/build/pdf'] !== 'undefined') {
+    window.pdfjsLib = window['pdfjs-dist/build/pdf'];
+  }
 
-document.addEventListener('DOMContentLoaded', function() {
-    const modal = document.getElementById('wrpr-modal');
-    const pdfContainer = document.getElementById('wrpr-pdf-container');
-    const closeButton = document.getElementById('wrpr-close');
-    let pdfLoadingTask = null;
+  if (window.pdfjsLib && window.pdfjsLib.GlobalWorkerOptions) {
+    // Versiyonu plugin’de enqueue ettiğin PDF.js ile eşleştir!
+    window.pdfjsLib.GlobalWorkerOptions.workerSrc =
+      'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+  }
 
-    document.querySelectorAll('.wrpr-language-filter').forEach(select => {
-        select.addEventListener('change', e => {
-            const val = e.target.value;
-            document.querySelectorAll('.wrpr-book-card').forEach(card => {
-                if (val === 'all' || card.dataset.language === val) {
-                    card.style.display = 'block';
-                } else {
-                    card.style.display = 'none';
-                }
-            });
-        });
-    });
+  const modal = document.getElementById('wrpr-modal');
+  const container = document.getElementById('wrpr-pdf-container');
+  const btnPrev = document.getElementById('wrpr-prev');
+  const btnNext = document.getElementById('wrpr-next');
+  const btnClose = document.getElementById('wrpr-close');
+  const pageNumEl = document.getElementById('wrpr-page-num');
+  const pageCountEl = document.getElementById('wrpr-page-count');
 
-    document.querySelectorAll('.wrpr-open-btn').forEach(btn => {
-        btn.addEventListener('click', async e => {
-            e.preventDefault();
+  let pdfDoc = null;
+  let currentPage = 1;
+  let readerId = '';
+  let pdfUrl = '';
+  let rendering = false;
+  let pending = null;
 
-            if (!modal || !pdfContainer) {
-                return;
-            }
+  function showModal() {
+    modal.style.display = 'flex';
+    document.documentElement.style.overflow = 'hidden';
+  }
+  function hideModal() {
+    modal.style.display = 'none';
+    document.documentElement.style.overflow = '';
+    // temizle
+    container.innerHTML = '';
+    pdfDoc = null;
+  }
 
-            const pdfUrl = btn.dataset.pdf;
-            const readerWrapper = btn.closest('.wrpr-reader-wrapper');
-            const readerId = readerWrapper ? readerWrapper.dataset.readerId : '';
+  async function renderPage(num) {
+    if (!pdfDoc || rendering) { pending = num; return; }
+    rendering = true;
+    try {
+      const page = await pdfDoc.getPage(num);
+      // responsive ölçek: genişliğe göre
+      const targetWidth = Math.min(1000, Math.floor(window.innerWidth * 0.9));
+      const viewport = page.getViewport({ scale: 1 });
+      const scale = targetWidth / viewport.width;
+      const scaledVp = page.getViewport({ scale });
 
-            pdfContainer.innerHTML = '';
+      // canvas kur
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      canvas.width = scaledVp.width;
+      canvas.height = scaledVp.height;
 
-            try {
-                await renderPDF(pdfUrl, 'wrpr-pdf-container', readerId);
-                modal.style.display = 'block';
-            } catch (error) {
-                console.error('PDF load error:', error);
-                modal.style.display = 'none';
-            }
-        });
-    });
+      container.innerHTML = '';
+      container.appendChild(canvas);
 
-    if (closeButton && modal) {
-        closeButton.addEventListener('click', () => {
-            modal.style.display = 'none';
-            if (pdfContainer) {
-                pdfContainer.innerHTML = '';
-            }
-        });
+      await page.render({ canvasContext: ctx, viewport: scaledVp }).promise;
+
+      currentPage = num;
+      pageNumEl.textContent = String(currentPage);
+      localStorage.setItem(`wrpr_progress_${readerId}_${pdfUrl}`, String(currentPage));
+    } catch (e) {
+      console.error('PDF render error:', e);
+      container.innerHTML = '<div style="padding:16px;color:#b00;font-weight:600">PDF yüklenemedi. (CORS/URL kontrol edin)</div>';
+    } finally {
+      rendering = false;
+      if (pending !== null && pending !== currentPage) {
+        const next = pending; pending = null; renderPage(next);
+      }
     }
+  }
 
-    async function renderPDF(url, containerId, readerId) {
-        const container = document.getElementById(containerId);
-
-        if (!container) {
-            throw new Error('PDF container not found.');
-        }
-
-        if (typeof pdfjsLib === 'undefined') {
-            throw new Error('PDF.js not loaded.');
-        }
-
-        if (pdfLoadingTask && typeof pdfLoadingTask.destroy === 'function') {
-            try {
-                await pdfLoadingTask.destroy();
-            } catch (destroyError) {
-                // Ignore destroy errors and continue with the new load task.
-            }
-        }
-
-        pdfLoadingTask = pdfjsLib.getDocument(url);
-        const pdf = await pdfLoadingTask.promise;
-        pdfLoadingTask = null;
-
-        const savedPage = parseInt(localStorage.getItem('wrpr_progress_' + readerId), 10);
-        const startPage = Number.isInteger(savedPage) && savedPage > 0 ? Math.min(savedPage, pdf.numPages) : 1;
-
-        let renderQueue = Promise.resolve();
-
-        function queueRender(pageNum) {
-            renderQueue = renderQueue.then(() => drawPage(pageNum));
-            renderQueue = renderQueue.catch(error => {
-                renderQueue = Promise.resolve();
-                throw error;
-            });
-            return renderQueue;
-        }
-
-        async function drawPage(pageNum) {
-            const page = await pdf.getPage(pageNum);
-            const viewport = page.getViewport({ scale: 1.5 });
-            const canvas = document.createElement('canvas');
-            const context = canvas.getContext('2d');
-
-            canvas.height = viewport.height;
-            canvas.width = viewport.width;
-
-            container.innerHTML = '';
-            container.appendChild(canvas);
-
-            await page.render({ canvasContext: context, viewport }).promise;
-            localStorage.setItem('wrpr_progress_' + readerId, pageNum);
-        }
-
-        await queueRender(startPage);
+  async function openPdf(url, rId) {
+    if (!window.pdfjsLib) {
+      console.error('PDF.js bulunamadı.');
+      return;
     }
-});
+    pdfUrl = url;
+    readerId = rId;
+    showModal();
+    container.innerHTML = '<div style="padding:16px">Loading…</div>';
+
+    try {
+      const loadingTask = window.pdfjsLib.getDocument({ url: pdfUrl, withCredentials: false });
+      pdfDoc = await loadingTask.promise;
+
+      pageCountEl.textContent = String(pdfDoc.numPages);
+      const saved = parseInt(localStorage.getItem(`wrpr_progress_${readerId}_${pdfUrl}`) || '1', 10);
+      const startPage = Math.min(Math.max(1, saved), pdfDoc.numPages);
+
+      await renderPage(startPage);
+    } catch (e) {
+      console.error('PDF load error:', e);
+      container.innerHTML = '<div style="padding:16px;color:#b00;font-weight:600">PDF açılamadı. (URL/CORS)</div>';
+    }
+  }
+
+  // Delege tıklama – dinamik DOM’da güvenilir
+  document.addEventListener('click', function (e) {
+    const openBtn = e.target.closest('.wrpr-read-btn');
+    if (openBtn) {
+      e.preventDefault();
+      const url = openBtn.getAttribute('data-pdf') || '';
+      const rid = openBtn.getAttribute('data-reader') || '';
+      if (!url) return;
+      openPdf(url, rid);
+    }
+  });
+
+  // Navigasyon
+  btnPrev && btnPrev.addEventListener('click', function () {
+    if (!pdfDoc) return;
+    if (currentPage <= 1) return;
+    renderPage(currentPage - 1);
+  });
+  btnNext && btnNext.addEventListener('click', function () {
+    if (!pdfDoc) return;
+    if (currentPage >= pdfDoc.numPages) return;
+    renderPage(currentPage + 1);
+  });
+  btnClose && btnClose.addEventListener('click', hideModal);
+
+  // Resize’da yeniden çiz (isteğe bağlı)
+  window.addEventListener('resize', function () {
+    if (pdfDoc && modal.style.display === 'flex') renderPage(currentPage);
+  });
+})();
