@@ -87,21 +87,28 @@ class WRPR_Shortcode {
                             <p><?php echo esc_html( $author ); ?></p>
                         </div>
                         <div class="wrpr-actions">
-                            <button class="wrpr-open-btn" data-pdf="<?php echo esc_url( $pdf_url ); ?>">Read PDF</button>
+                            <button class="wrpr-read-btn"
+                                    data-pdf="<?php echo esc_url( $pdf_url ); ?>"
+                                    data-reader="<?php echo esc_attr( $reader_id ); ?>">
+                                Read PDF
+                            </button>
                             <?php if ( ! empty( $buy_link ) ) : ?>
-                                <a href="<?php echo esc_url( $buy_link ); ?>" target="_blank" class="wrpr-buy-link">Buy Now</a>
+                                <a class="wrpr-buy-link" href="<?php echo esc_url( $buy_link ); ?>" target="_blank">Buy Now</a>
                             <?php endif; ?>
                         </div>
                     </div>
                 <?php endforeach; ?>
             </div>
-
-            <!-- PDF Modal -->
-            <div id="wrpr-modal" style="display:none;">
-                <div id="wrpr-pdf-viewer">
-                    <div id="wrpr-pdf-container"></div>
+        </div>
+        <div id="wrpr-modal" style="display:none;">
+            <div id="wrpr-pdf-shell">
+                <div id="wrpr-toolbar">
+                    <button id="wrpr-prev">◀</button>
+                    <span id="wrpr-page-info">Page <span id="wrpr-page-num">1</span> / <span id="wrpr-page-count">1</span></span>
+                    <button id="wrpr-next">▶</button>
+                    <button id="wrpr-close">✕</button>
                 </div>
-                <button id="wrpr-close">× Close</button>
+                <div id="wrpr-pdf-container"></div>
             </div>
         </div>
         <?php
