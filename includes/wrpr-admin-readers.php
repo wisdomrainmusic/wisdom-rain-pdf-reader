@@ -56,6 +56,15 @@ class WRPR_Admin_Readers {
     }
 
     public static function render_page() {
+        if ( isset( $_GET['edit'] ) ) {
+            $reader_id = sanitize_text_field( wp_unslash( $_GET['edit'] ) );
+
+            require_once WRPR_PATH . 'includes/wrpr-admin-edit.php';
+            WRPR_Admin_Edit::render_edit_page( $reader_id );
+
+            return;
+        }
+
         if ( isset( $_POST['wrpr_create_reader'] ) && ! empty( $_POST['wrpr_reader_name'] ) ) {
             if ( ! isset( $_POST['wrpr_reader_nonce'] ) || ! wp_verify_nonce( wp_unslash( $_POST['wrpr_reader_nonce'] ), 'wrpr_manage_readers' ) ) {
                 wp_die( esc_html__( 'Security check failed. Please try again.', 'wrpr' ) );
@@ -92,15 +101,16 @@ class WRPR_Admin_Readers {
             foreach ( $readers as $reader ) {
                 $shortcode    = '[wrpr_reader id="' . esc_attr( $reader['id'] ) . '"]';
                 $books_count  = isset( $reader['books'] ) && is_array( $reader['books'] ) ? count( $reader['books'] ) : 0;
-                $delete_url   = wp_nonce_url( add_query_arg( array( 'page' => 'wrpr-manage-readers', 'delete' => $reader['id'] ), admin_url( 'admin.php' ) ), 'wrpr_delete_reader' );
-                $duplicate_url = wp_nonce_url( add_query_arg( array( 'page' => 'wrpr-manage-readers', 'duplicate' => $reader['id'] ), admin_url( 'admin.php' ) ), 'wrpr_duplicate_reader' );
+                $page_url      = admin_url( 'admin.php' );
+                $delete_url    = wp_nonce_url( add_query_arg( array( 'page' => 'wrpr-manage-readers', 'delete' => $reader['id'] ), $page_url ), 'wrpr_delete_reader' );
 
                 echo '<tr>';
                 echo '<td>' . esc_html( $reader['name'] ) . '</td>';
                 echo '<td>' . esc_html( $reader['slug'] ) . '</td>';
                 echo '<td>' . absint( $books_count ) . '</td>';
                 echo '<td><input type="text" readonly value="' . esc_attr( $shortcode ) . '" style="width:240px" /></td>';
-                echo '<td><a href="' . esc_url( $duplicate_url ) . '">Duplicate</a> | ';
+                echo '<td><a href="?page=wrpr-edit&reader_id=' . esc_attr( $reader['id'] ) . '">Edit Books</a> | ';
+                echo '<a href="?page=wrpr-manage-readers&duplicate=' . esc_attr( $reader['id'] ) . '">Duplicate</a> | ';
                 echo '<a href="' . esc_url( $delete_url ) . '">Delete</a></td>';
                 echo '</tr>';
             }
@@ -108,4 +118,10 @@ class WRPR_Admin_Readers {
         }
         echo '</div>';
     }
+}
+
+if ( isset($_GET['page']) && $_GET['page'] === 'wrpr-edit' && isset($_GET['reader_id']) ) {
+    require_once WRPR_PATH . 'includes/wrpr-admin-edit.php';
+    WRPR_Admin_Edit::render_edit_page( sanitize_text_field($_GET['reader_id']) );
+    return;
 }
