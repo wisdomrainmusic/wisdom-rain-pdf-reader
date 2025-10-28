@@ -19,6 +19,88 @@
   const hasFullscreenSupport =
     !!modal && typeof modal.requestFullscreen === 'function' && typeof document.exitFullscreen === 'function';
 
+  function bindFastAction(element, handler) {
+    if (!element || typeof handler !== 'function') {
+      return;
+    }
+
+    const getNow = () =>
+      typeof performance !== 'undefined' && performance && typeof performance.now === 'function'
+        ? performance.now()
+        : Date.now();
+    let lastFastInvocation = 0;
+
+    element.addEventListener('click', (event) => {
+      if (getNow() - lastFastInvocation < 250) {
+        return;
+      }
+      handler(event);
+    });
+
+    const invokeFast = (event) => {
+      lastFastInvocation = getNow();
+      if (event && typeof event.preventDefault === 'function') {
+        event.preventDefault();
+      }
+      handler(event);
+    };
+
+    if (window.PointerEvent) {
+      element.addEventListener(
+        'pointerup',
+        (event) => {
+          if (event.pointerType && event.pointerType !== 'mouse') {
+            invokeFast(event);
+          }
+        },
+        { passive: false }
+      );
+    } else {
+      element.addEventListener(
+        'touchend',
+        (event) => {
+          invokeFast(event);
+        },
+        { passive: false }
+      );
+    }
+  }
+
+  let safeAreaCache = {
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
+  };
+  let safeAreaDirty = true;
+
+  function refreshSafeAreaCache() {
+    const rootStyle = window.getComputedStyle(document.documentElement);
+    const parseInset = (name) => {
+      const raw = rootStyle.getPropertyValue(`--wrpr-safe-area-${name}`);
+      const value = parseFloat(raw);
+      return Number.isFinite(value) ? value : 0;
+    };
+    safeAreaCache = {
+      top: parseInset('top'),
+      right: parseInset('right'),
+      bottom: parseInset('bottom'),
+      left: parseInset('left'),
+    };
+    safeAreaDirty = false;
+  }
+
+  function markSafeAreaDirty() {
+    safeAreaDirty = true;
+  }
+
+  function getSafeAreaInsets() {
+    if (safeAreaDirty) {
+      refreshSafeAreaCache();
+    }
+    return safeAreaCache;
+  }
+
   function wrprAddFullscreenButton(targetModal) {
     if (!targetModal || targetModal.querySelector('.wrpr-fs-btn')) {
       return null;
@@ -38,7 +120,7 @@
       fsBtn.classList.toggle('wrpr-fs-btn--active', isActive);
     };
 
-    fsBtn.addEventListener('click', () => {
+    bindFastAction(fsBtn, () => {
       if (!document.fullscreenElement) {
         targetModal.requestFullscreen().catch(console.warn);
       } else {
@@ -198,21 +280,6 @@
         // Ignore storage errors.
       }
     }
-  }
-
-  function getSafeAreaInsets() {
-    const rootStyle = window.getComputedStyle(document.documentElement);
-    const parseInset = (name) => {
-      const raw = rootStyle.getPropertyValue(`--wrpr-safe-area-${name}`);
-      const value = parseFloat(raw);
-      return Number.isFinite(value) ? value : 0;
-    };
-    return {
-      top: parseInset('top'),
-      right: parseInset('right'),
-      bottom: parseInset('bottom'),
-      left: parseInset('left'),
-    };
   }
 
   function computeResponsiveScale(viewport) {
@@ -414,7 +481,7 @@
         requestRender(currentPage - 1);
       }
     }, 150);
-    btnPrev.addEventListener('click', () => handlePrev());
+    bindFastAction(btnPrev, () => handlePrev());
   }
   if (btnNext) {
     const handleNext = debounce(() => {
@@ -422,10 +489,10 @@
         requestRender(currentPage + 1);
       }
     }, 150);
-    btnNext.addEventListener('click', () => handleNext());
+    bindFastAction(btnNext, () => handleNext());
   }
   if (btnClose) {
-    btnClose.addEventListener('click', hideModal);
+    bindFastAction(btnClose, () => hideModal());
   }
 
   updateNavState();
@@ -477,15 +544,24 @@
     }
   }, 120);
 
-  window.addEventListener('resize', handleViewportChange);
-  window.addEventListener('orientationchange', handleViewportChange);
+  window.addEventListener('resize', () => {
+    markSafeAreaDirty();
+    handleViewportChange();
+  });
+  window.addEventListener('orientationchange', () => {
+    markSafeAreaDirty();
+    handleViewportChange();
+  });
 
   document.addEventListener('fullscreenchange', () => {
     if (!modal) {
       return;
     }
+    markSafeAreaDirty();
     if (document.fullscreenElement === modal || !document.fullscreenElement) {
       handleViewportChange();
     }
   });
+
+  refreshSafeAreaCache();
 })();
