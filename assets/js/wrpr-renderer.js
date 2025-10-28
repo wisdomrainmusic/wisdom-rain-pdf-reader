@@ -26,7 +26,6 @@
         <div class="wrpr-page-info">Page 1</div>
         <div class="wrpr-nav">
           <button id="wrpr-prev"><i class="fas fa-backward"></i></button>
-          <button id="wrpr-play" class="wrpr-play"><i class="fas fa-play"></i></button>
           <button id="wrpr-next"><i class="fas fa-forward"></i></button>
         </div>
       </div>
