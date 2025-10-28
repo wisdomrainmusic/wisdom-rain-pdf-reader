@@ -223,3 +223,49 @@
   border-radius: 10px;
   font-size: 14px;
 }
+
+/* ===== WRPR Modern Reader Controls ===== */
+.wrpr-nav {
+  position: absolute;
+  bottom: 30px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 25px;
+  z-index: 9999;
+}
+
+.wrpr-nav button {
+  width: 70px;
+  height: 70px;
+  border-radius: 50%;
+  border: none;
+  background-color: #ff0000; /* vivid red */
+  color: #fff;
+  font-size: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2);
+  cursor: pointer;
+  transition: all 0.25s ease;
+}
+
+.wrpr-nav button:hover {
+  transform: scale(1.1);
+  background-color: #e00000;
+}
+
+.wrpr-nav button:active {
+  transform: scale(0.95);
+}
+
+/* Play/Pause button style for the middle control */
+.wrpr-play {
+  width: 80px !important;
+  height: 80px !important;
+  background-color: #ff0000;
+  font-size: 32px;
+}
