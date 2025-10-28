@@ -99,17 +99,6 @@ class WRPR_Shortcode {
                 <?php endforeach; ?>
             </div>
         </div>
-        <div id="wrpr-modal" style="display:none;">
-            <div id="wrpr-pdf-shell">
-                <div id="wrpr-toolbar">
-                    <button id="wrpr-prev">◀</button>
-                    <span id="wrpr-page-info">Page <span id="wrpr-page-num">1</span> / <span id="wrpr-page-count">1</span></span>
-                    <button id="wrpr-next">▶</button>
-                    <button id="wrpr-close">✕</button>
-                </div>
-                <div id="wrpr-pdf-container"></div>
-            </div>
-        </div>
         <?php
         return ob_get_clean();
     }
