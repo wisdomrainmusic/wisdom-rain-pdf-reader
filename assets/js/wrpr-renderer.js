@@ -16,6 +16,51 @@
   const btnNext = modal ? modal.querySelector('#wrpr-next') : null;
   const btnClose = modal ? modal.querySelector('#wrpr-close') : null;
   const pageInfoEl = modal ? modal.querySelector('.wrpr-page-info') : null;
+  const hasFullscreenSupport =
+    !!modal && typeof modal.requestFullscreen === 'function' && typeof document.exitFullscreen === 'function';
+
+  function wrprAddFullscreenButton(targetModal) {
+    if (!targetModal || targetModal.querySelector('.wrpr-fs-btn')) {
+      return null;
+    }
+
+    const fsBtn = document.createElement('button');
+    fsBtn.className = 'wrpr-fs-btn';
+    fsBtn.type = 'button';
+    fsBtn.innerHTML = '⤢';
+    fsBtn.title = 'Toggle Fullscreen';
+    fsBtn.setAttribute('aria-pressed', 'false');
+    fsBtn.setAttribute('aria-label', 'Toggle fullscreen');
+
+    const syncState = () => {
+      const isActive = document.fullscreenElement === targetModal;
+      fsBtn.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+      fsBtn.classList.toggle('wrpr-fs-btn--active', isActive);
+    };
+
+    fsBtn.addEventListener('click', () => {
+      if (!document.fullscreenElement) {
+        targetModal.requestFullscreen().catch(console.warn);
+      } else {
+        if (typeof document.exitFullscreen === 'function') {
+          const result = document.exitFullscreen();
+          if (result && typeof result.catch === 'function') {
+            result.catch(console.warn);
+          }
+        }
+      }
+    });
+
+    document.addEventListener('fullscreenchange', syncState);
+    syncState();
+
+    targetModal.appendChild(fsBtn);
+    return fsBtn;
+  }
+
+  if (hasFullscreenSupport) {
+    wrprAddFullscreenButton(modal);
+  }
 
   let pdfDoc = null;
   let currentPage = 1;
@@ -27,6 +72,7 @@
   let progressTimer = null;
   let pendingProgress = null;
   let renderCycle = 0;
+  let renderFrameToken = null;
 
   if (typeof window.renderLock !== 'boolean') {
     window.renderLock = false;
@@ -111,6 +157,10 @@
       window.clearTimeout(progressTimer);
       progressTimer = null;
     }
+    if (renderFrameToken !== null) {
+      window.cancelAnimationFrame(renderFrameToken);
+      renderFrameToken = null;
+    }
     pendingPage = null;
     renderCycle = 0;
     window.renderLock = false;
@@ -150,13 +200,49 @@
     }
   }
 
+  function getSafeAreaInsets() {
+    const rootStyle = window.getComputedStyle(document.documentElement);
+    const parseInset = (name) => {
+      const raw = rootStyle.getPropertyValue(`--wrpr-safe-area-${name}`);
+      const value = parseFloat(raw);
+      return Number.isFinite(value) ? value : 0;
+    };
+    return {
+      top: parseInset('top'),
+      right: parseInset('right'),
+      bottom: parseInset('bottom'),
+      left: parseInset('left'),
+    };
+  }
+
+  function computeResponsiveScale(viewport) {
+    const safe = getSafeAreaInsets();
+    const usableWidth = Math.max(0, window.innerWidth - safe.left - safe.right);
+    const usableHeight = Math.max(0, window.innerHeight - safe.top - safe.bottom);
+    const widthScale = viewport.width ? (usableWidth * 0.96) / viewport.width : 1;
+    const heightScale = viewport.height ? (usableHeight * 0.9) / viewport.height : 1;
+    const result = Math.min(widthScale, heightScale);
+    return result > 0 ? result : 1;
+  }
+
+  function ensureRenderLoop() {
+    if (renderFrameToken !== null) {
+      return;
+    }
+    renderFrameToken = window.requestAnimationFrame(() => {
+      renderFrameToken = null;
+      if (window.renderLock) {
+        ensureRenderLoop();
+        return;
+      }
+      processRenderQueue();
+    });
+  }
+
   function requestRender(num) {
     if (!pdfDoc || !canvasEl) return;
     pendingPage = num;
-    if (window.renderLock) {
-      return;
-    }
-    processRenderQueue();
+    ensureRenderLoop();
   }
 
   async function processRenderQueue() {
@@ -177,7 +263,7 @@
     } finally {
       window.renderLock = false;
       if (pendingPage !== null && pdfDoc && canvasEl) {
-        processRenderQueue();
+        ensureRenderLoop();
       }
     }
   }
@@ -192,7 +278,7 @@
 
       const page = await activeDoc.getPage(num);
       const vp = page.getViewport({ scale: 1 });
-      const scale = Math.min((window.innerWidth * 0.9) / vp.width, (window.innerHeight * 0.8) / vp.height);
+      const scale = computeResponsiveScale(vp);
       const viewport = page.getViewport({ scale });
       const ctx = canvasEl.getContext('2d');
       if (!ctx) {
@@ -383,5 +469,23 @@
 
   document.querySelectorAll('.wrpr-reader-wrapper').forEach((wrapper) => {
     bindReader(wrapper);
+  });
+
+  const handleViewportChange = debounce(() => {
+    if (pdfDoc && canvasEl && currentPage) {
+      requestRender(currentPage);
+    }
+  }, 120);
+
+  window.addEventListener('resize', handleViewportChange);
+  window.addEventListener('orientationchange', handleViewportChange);
+
+  document.addEventListener('fullscreenchange', () => {
+    if (!modal) {
+      return;
+    }
+    if (document.fullscreenElement === modal || !document.fullscreenElement) {
+      handleViewportChange();
+    }
   });
 })();

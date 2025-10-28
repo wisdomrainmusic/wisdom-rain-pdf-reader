@@ -1,3 +1,10 @@
+:root {
+  --wrpr-safe-area-top: env(safe-area-inset-top, 0px);
+  --wrpr-safe-area-right: env(safe-area-inset-right, 0px);
+  --wrpr-safe-area-bottom: env(safe-area-inset-bottom, 0px);
+  --wrpr-safe-area-left: env(safe-area-inset-left, 0px);
+}
+
 .wrpr-reader-wrapper {
   font-family: 'Inter', sans-serif;
   padding: 20px;
@@ -100,7 +107,8 @@
   display: none;
   align-items: center;
   justify-content: center;
-  padding: 40px 20px;
+  padding: calc(40px + var(--wrpr-safe-area-top)) calc(20px + var(--wrpr-safe-area-right))
+    calc(40px + var(--wrpr-safe-area-bottom)) calc(20px + var(--wrpr-safe-area-left));
   background: rgba(0, 0, 0, 0.85);
   z-index: 9999;
   overflow-y: auto;
@@ -172,7 +180,7 @@
 /* ===== WRPR Reader Navigation – Final Polished ===== */
 .wrpr-nav {
   position: absolute;
-  bottom: 60px; /* sayfa numarasının hemen altına */
+  bottom: calc(60px + var(--wrpr-safe-area-bottom)); /* sayfa numarasının hemen altına */
   left: 50%;
   transform: translateX(-50%);
   display: flex;
@@ -180,6 +188,51 @@
   justify-content: center;
   gap: 20px;
   z-index: 9999;
+}
+
+.wrpr-fs-btn {
+  position: absolute;
+  bottom: calc(90px + var(--wrpr-safe-area-bottom));
+  right: calc(20px + var(--wrpr-safe-area-right));
+  width: 45px;
+  height: 45px;
+  border-radius: 50%;
+  border: none;
+  background: #ff0000;
+  color: #fff;
+  font-size: 20px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.25);
+  transition: transform 0.2s ease, background 0.3s ease, box-shadow 0.3s ease;
+  z-index: 10002;
+  cursor: pointer;
+}
+
+.wrpr-fs-btn:hover,
+.wrpr-fs-btn:focus-visible {
+  background: #d40000;
+  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.3);
+}
+
+.wrpr-fs-btn:active {
+  transform: scale(0.92);
+}
+
+.wrpr-fs-btn:focus-visible {
+  outline: 3px solid rgba(255, 255, 255, 0.75);
+  outline-offset: 3px;
+}
+
+.wrpr-fs-btn--active {
+  background: #c20000;
+}
+
+@media (min-width: 1024px) {
+  .wrpr-fs-btn {
+    display: none;
+  }
 }
 
 .wrpr-nav button {
@@ -249,7 +302,7 @@
 /* Sayfa numarası stilini biraz yumuşatıyoruz */
 .wrpr-page-info {
   position: absolute;
-  bottom: 120px;
+  bottom: calc(120px + var(--wrpr-safe-area-bottom));
   left: 50%;
   transform: translateX(-50%);
   color: #444;
@@ -276,7 +329,7 @@
   }
 
   .wrpr-nav {
-    bottom: 55px;
+    bottom: calc(55px + var(--wrpr-safe-area-bottom));
     gap: 18px;
   }
 
@@ -288,7 +341,7 @@
   }
 
   .wrpr-page-info {
-    bottom: 95px;
+    bottom: calc(95px + var(--wrpr-safe-area-bottom));
     font-size: 12px;
     padding: 2px 8px;
   }
