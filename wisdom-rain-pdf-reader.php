@@ -72,3 +72,28 @@ function wrpr_enqueue_assets() {
     );
 }
 add_action('wp_enqueue_scripts', 'wrpr_enqueue_assets');
+
+function wrpr_render_modal_shell() {
+    if ( is_admin() ) {
+        return;
+    }
+
+    ?>
+    <div id="wrpr-modal" aria-hidden="true" role="dialog" aria-modal="true" aria-label="<?php echo esc_attr__( 'PDF reader', 'wrpr' ); ?>">
+        <div id="wrpr-modal-content">
+            <button type="button" id="wrpr-close" aria-label="<?php echo esc_attr__( 'Close reader', 'wrpr' ); ?>">&times;</button>
+            <canvas id="wrpr-pdf-canvas"></canvas>
+            <div class="wrpr-page-info"><?php echo esc_html__( 'Page 1', 'wrpr' ); ?></div>
+            <div class="wrpr-nav">
+                <button type="button" id="wrpr-prev" aria-label="<?php echo esc_attr__( 'Previous page', 'wrpr' ); ?>">
+                    <i class="fas fa-backward" aria-hidden="true"></i>
+                </button>
+                <button type="button" id="wrpr-next" aria-label="<?php echo esc_attr__( 'Next page', 'wrpr' ); ?>">
+                    <i class="fas fa-forward" aria-hidden="true"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+    <?php
+}
+add_action( 'wp_footer', 'wrpr_render_modal_shell' );

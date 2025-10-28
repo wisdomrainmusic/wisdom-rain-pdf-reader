@@ -10,39 +10,27 @@
   }
 
   // --- Modal setup ---
-  let modal = document.getElementById('wrpr-modal');
-  if (!modal) {
-    modal = document.createElement('div');
-    modal.id = 'wrpr-modal';
-    modal.style.display = 'none';
-    modal.setAttribute('aria-hidden', 'true');
-    modal.setAttribute('role', 'dialog');
-    modal.setAttribute('aria-modal', 'true');
-    modal.setAttribute('aria-label', 'PDF reader');
-    modal.innerHTML = `
-      <div id="wrpr-modal-content">
-        <span id="wrpr-close">&times;</span>
-        <canvas id="wrpr-pdf-canvas"></canvas>
-        <div class="wrpr-page-info">Page 1</div>
-        <div class="wrpr-nav">
-          <button id="wrpr-prev"><i class="fas fa-backward"></i></button>
-          <button id="wrpr-next"><i class="fas fa-forward"></i></button>
-        </div>
-      </div>
-    `;
-    document.body.appendChild(modal);
-  }
-
-  const canvasEl = document.getElementById('wrpr-pdf-canvas');
-  const btnPrev = document.getElementById('wrpr-prev');
-  const btnNext = document.getElementById('wrpr-next');
-  const btnClose = document.getElementById('wrpr-close');
-  const pageInfoEl = modal.querySelector('.wrpr-page-info');
+  const modal = document.getElementById('wrpr-modal');
+  const canvasEl = modal ? modal.querySelector('#wrpr-pdf-canvas') : null;
+  const btnPrev = modal ? modal.querySelector('#wrpr-prev') : null;
+  const btnNext = modal ? modal.querySelector('#wrpr-next') : null;
+  const btnClose = modal ? modal.querySelector('#wrpr-close') : null;
+  const pageInfoEl = modal ? modal.querySelector('.wrpr-page-info') : null;
 
   let pdfDoc = null;
   let currentPage = 1;
   let readerId = '';
   let pdfUrl = '';
+  let loadingTask = null;
+  let pendingPage = null;
+  let progressKey = '';
+  let progressTimer = null;
+  let pendingProgress = null;
+  let renderCycle = 0;
+
+  if (typeof window.renderLock !== 'boolean') {
+    window.renderLock = false;
+  }
 
   function setPageInfo(text) {
     if (pageInfoEl) {
@@ -61,53 +49,175 @@
   function updateNavState() {
     const hasDoc = !!pdfDoc;
     if (btnPrev) {
-      btnPrev.disabled = !hasDoc || currentPage <= 1;
+      const disabled = !hasDoc || currentPage <= 1;
+      btnPrev.disabled = disabled;
+      btnPrev.setAttribute('aria-disabled', disabled ? 'true' : 'false');
+      btnPrev.classList.toggle('is-disabled', disabled);
     }
     if (btnNext) {
-      btnNext.disabled = !hasDoc || (pdfDoc ? currentPage >= pdfDoc.numPages : true);
+      const disabled = !hasDoc || (pdfDoc ? currentPage >= pdfDoc.numPages : true);
+      btnNext.disabled = disabled;
+      btnNext.setAttribute('aria-disabled', disabled ? 'true' : 'false');
+      btnNext.classList.toggle('is-disabled', disabled);
     }
   }
 
   function showModal() {
+    if (!modal) {
+      return;
+    }
     modal.style.display = 'flex';
     modal.setAttribute('aria-hidden', 'false');
     document.documentElement.style.overflow = 'hidden';
   }
 
   function hideModal() {
-    modal.style.display = 'none';
-    modal.setAttribute('aria-hidden', 'true');
+    if (modal) {
+      modal.style.display = 'none';
+      modal.setAttribute('aria-hidden', 'true');
+    }
     document.documentElement.style.overflow = '';
     if (canvasEl) {
       const ctx = canvasEl.getContext('2d');
       if (ctx) {
         ctx.clearRect(0, 0, canvasEl.width, canvasEl.height);
       }
+      canvasEl.classList.remove('wrpr-canvas-fade-out');
+      canvasEl.removeAttribute('width');
+      canvasEl.removeAttribute('height');
+      canvasEl.style.removeProperty('width');
+      canvasEl.style.removeProperty('height');
+    }
+    if (pdfDoc) {
+      try {
+        pdfDoc.destroy();
+      } catch (err) {
+        // Ignore destruction errors.
+      }
     }
     pdfDoc = null;
+    if (loadingTask && typeof loadingTask.destroy === 'function') {
+      try {
+        loadingTask.destroy();
+      } catch (err) {
+        // Ignore destruction errors.
+      }
+    }
+    loadingTask = null;
+    flushProgressWrite();
+    progressKey = '';
+    pendingProgress = null;
+    if (progressTimer) {
+      window.clearTimeout(progressTimer);
+      progressTimer = null;
+    }
+    pendingPage = null;
+    renderCycle = 0;
+    window.renderLock = false;
     currentPage = 1;
     updateNavState();
     setPageInfo('Loading PDF...');
   }
 
-  async function renderPage(num) {
+  function saveProgress(page) {
+    if (!progressKey) return;
+    pendingProgress = page;
+    if (progressTimer) {
+      window.clearTimeout(progressTimer);
+    }
+    progressTimer = window.setTimeout(() => {
+      try {
+        localStorage.setItem(progressKey, String(pendingProgress));
+      } catch (err) {
+        // Ignore storage errors (e.g., private mode, quota exceeded)
+      }
+      progressTimer = null;
+    }, 200);
+  }
+
+  function flushProgressWrite() {
+    if (!progressKey) return;
+    if (progressTimer) {
+      window.clearTimeout(progressTimer);
+      progressTimer = null;
+    }
+    if (pendingProgress != null) {
+      try {
+        localStorage.setItem(progressKey, String(pendingProgress));
+      } catch (err) {
+        // Ignore storage errors.
+      }
+    }
+  }
+
+  function requestRender(num) {
     if (!pdfDoc || !canvasEl) return;
+    pendingPage = num;
+    if (window.renderLock) {
+      return;
+    }
+    processRenderQueue();
+  }
+
+  async function processRenderQueue() {
+    if (!pdfDoc || !canvasEl) {
+      window.renderLock = false;
+      return;
+    }
+    if (window.renderLock) {
+      return;
+    }
+    window.renderLock = true;
     try {
-      const page = await pdfDoc.getPage(num);
+      while (pendingPage !== null) {
+        const targetPage = pendingPage;
+        pendingPage = null;
+        await renderPageInternal(targetPage);
+      }
+    } finally {
+      window.renderLock = false;
+      if (pendingPage !== null && pdfDoc && canvasEl) {
+        processRenderQueue();
+      }
+    }
+  }
+
+  async function renderPageInternal(num) {
+    if (!pdfDoc || !canvasEl) return;
+    const activeDoc = pdfDoc;
+    const activeKey = progressKey;
+    try {
+      const cycleId = ++renderCycle;
+      canvasEl.classList.add('wrpr-canvas-fade-out');
+
+      const page = await activeDoc.getPage(num);
       const vp = page.getViewport({ scale: 1 });
       const scale = Math.min((window.innerWidth * 0.9) / vp.width, (window.innerHeight * 0.8) / vp.height);
       const viewport = page.getViewport({ scale });
       const ctx = canvasEl.getContext('2d');
       if (!ctx) {
+        if (canvasEl) {
+          canvasEl.classList.remove('wrpr-canvas-fade-out');
+        }
         return;
       }
-      canvasEl.classList.add('wrpr-flip');
-      window.setTimeout(() => canvasEl.classList.remove('wrpr-flip'), 250);
       const outputScale = window.devicePixelRatio || 1;
-      canvasEl.width = viewport.width * outputScale;
-      canvasEl.height = viewport.height * outputScale;
-      canvasEl.style.width = `${viewport.width}px`;
-      canvasEl.style.height = `${viewport.height}px`;
+      const targetWidth = Math.floor(viewport.width * outputScale);
+      const targetHeight = Math.floor(viewport.height * outputScale);
+      if (canvasEl.width !== targetWidth) {
+        canvasEl.width = targetWidth;
+      }
+      if (canvasEl.height !== targetHeight) {
+        canvasEl.height = targetHeight;
+      }
+      const cssWidth = `${viewport.width}px`;
+      const cssHeight = `${viewport.height}px`;
+      if (canvasEl.style.width !== cssWidth) {
+        canvasEl.style.width = cssWidth;
+      }
+      if (canvasEl.style.height !== cssHeight) {
+        canvasEl.style.height = cssHeight;
+      }
       ctx.setTransform(1, 0, 0, 1, 0, 0);
       ctx.clearRect(0, 0, canvasEl.width, canvasEl.height);
       const renderContext = { canvasContext: ctx, viewport };
@@ -115,18 +225,41 @@
         renderContext.transform = [outputScale, 0, 0, outputScale, 0, 0];
       }
       await page.render(renderContext).promise;
+      if (!pdfDoc || pdfDoc !== activeDoc) {
+        canvasEl.classList.remove('wrpr-canvas-fade-out');
+        return;
+      }
+      if (cycleId !== renderCycle) {
+        canvasEl.classList.remove('wrpr-canvas-fade-out');
+        return;
+      }
+      window.requestAnimationFrame(() => {
+        if (canvasEl && cycleId === renderCycle) {
+          canvasEl.classList.remove('wrpr-canvas-fade-out');
+        }
+      });
       currentPage = num;
       updatePageInfo();
       updateNavState();
-      localStorage.setItem(`wrpr_progress_${readerId}_${pdfUrl}`, num);
+      if (progressKey === activeKey) {
+        saveProgress(num);
+      }
     } catch (err) {
+      canvasEl.classList.remove('wrpr-canvas-fade-out');
       setPageInfo(`PDF render error: ${err.message || err}`);
     }
   }
 
   async function openPDF(url, rid) {
+    if (!modal || !canvasEl) {
+      // Modal shell is required for the reader to operate.
+      return;
+    }
     readerId = rid;
     pdfUrl = url;
+    flushProgressWrite();
+    progressKey = `wrpr_progress_${readerId}_${pdfUrl}`;
+    pendingProgress = null;
     showModal();
     setPageInfo('Loading PDF...');
     updateNavState();
@@ -135,12 +268,22 @@
       return;
     }
     try {
-      const loadingTask = window.pdfjsLib.getDocument({ url: pdfUrl });
+      if (loadingTask && typeof loadingTask.destroy === 'function') {
+        try {
+          loadingTask.destroy();
+        } catch (err) {
+          // Ignore errors from destroying stale loading tasks.
+        }
+      }
+      loadingTask = window.pdfjsLib.getDocument({ url: pdfUrl });
       pdfDoc = await loadingTask.promise;
       updateNavState();
-      const stored = parseInt(localStorage.getItem(`wrpr_progress_${rid}_${url}`) || '1', 10);
+      const stored = parseInt(localStorage.getItem(progressKey) || '1', 10);
       const startPage = Number.isFinite(stored) ? Math.min(Math.max(1, stored), pdfDoc.numPages) : 1;
-      await renderPage(startPage);
+      currentPage = startPage;
+      updatePageInfo();
+      pendingPage = null;
+      requestRender(startPage);
     } catch (err) {
       setPageInfo(`PDF load error: ${err.message}`);
       pdfDoc = null;
@@ -149,26 +292,51 @@
   }
 
   // --- Button bindings ---
-  document.addEventListener('click', (e) => {
-    const btn = e.target.closest('.wrpr-read-btn');
-    if (btn) {
-      e.preventDefault();
-      const pdf = btn.dataset.pdf || '';
-      if (!pdf) return;
-      const rid = btn.dataset.reader || '';
-      openPDF(pdf, rid);
-    }
-  });
+  function debounce(fn, wait) {
+    let timer = null;
+    let queuedArgs = null;
+    return (...args) => {
+      if (!timer) {
+        fn(...args);
+        timer = window.setTimeout(() => {
+          timer = null;
+          if (queuedArgs) {
+            const latest = queuedArgs;
+            queuedArgs = null;
+            fn(...latest);
+          }
+        }, wait);
+        return;
+      }
+
+      queuedArgs = args;
+      window.clearTimeout(timer);
+      timer = window.setTimeout(() => {
+        timer = null;
+        if (queuedArgs) {
+          const latest = queuedArgs;
+          queuedArgs = null;
+          fn(...latest);
+        }
+      }, wait);
+    };
+  }
 
   if (btnPrev) {
-    btnPrev.addEventListener('click', () => {
-      if (pdfDoc && currentPage > 1) renderPage(currentPage - 1);
-    });
+    const handlePrev = debounce(() => {
+      if (pdfDoc && currentPage > 1) {
+        requestRender(currentPage - 1);
+      }
+    }, 150);
+    btnPrev.addEventListener('click', () => handlePrev());
   }
   if (btnNext) {
-    btnNext.addEventListener('click', () => {
-      if (pdfDoc && currentPage < pdfDoc.numPages) renderPage(currentPage + 1);
-    });
+    const handleNext = debounce(() => {
+      if (pdfDoc && pdfDoc.numPages && currentPage < pdfDoc.numPages) {
+        requestRender(currentPage + 1);
+      }
+    }, 150);
+    btnNext.addEventListener('click', () => handleNext());
   }
   if (btnClose) {
     btnClose.addEventListener('click', hideModal);
@@ -176,13 +344,44 @@
 
   updateNavState();
 
-  document
-    .querySelector('.wrpr-language-filter')
-    ?.addEventListener('change', (e) => {
-      const lang = e.target.value;
-      document.querySelectorAll('.wrpr-book-card').forEach((card) => {
-        const match = lang === 'All' || card.dataset.lang === lang;
-        card.style.display = match ? 'flex' : 'none';
+  function bindReader(wrapper) {
+    const wrapperReaderId = wrapper.dataset.readerId || '';
+    const bookCards = Array.from(wrapper.querySelectorAll('.wrpr-book-card'));
+
+    wrapper.querySelectorAll('.wrpr-read-btn').forEach((btn) => {
+      btn.addEventListener('click', (event) => {
+        event.preventDefault();
+        const pdf = btn.dataset.pdf || '';
+        if (!pdf) {
+          return;
+        }
+        const rid = btn.dataset.reader || wrapperReaderId;
+        openPDF(pdf, rid);
       });
     });
+
+    const langSelects = wrapper.querySelectorAll('.wrpr-lang-select');
+    if (!langSelects.length || !bookCards.length) {
+      return;
+    }
+
+    const applyFilter = (value) => {
+      const active = value === 'All' ? null : value;
+      bookCards.forEach((card) => {
+        const match = !active || card.dataset.lang === active;
+        card.style.display = match ? 'flex' : 'none';
+      });
+    };
+
+    langSelects.forEach((select) => {
+      select.addEventListener('change', (event) => {
+        applyFilter(event.target.value);
+      });
+      applyFilter(select.value);
+    });
+  }
+
+  document.querySelectorAll('.wrpr-reader-wrapper').forEach((wrapper) => {
+    bindReader(wrapper);
+  });
 })();
