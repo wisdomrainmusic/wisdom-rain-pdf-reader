@@ -12,66 +12,115 @@
   // --- Modal setup ---
   let modal = document.getElementById('wrpr-modal');
   if (!modal) {
-    const html = `
-      <div id="wrpr-modal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;
-      background:rgba(0,0,0,0.85);z-index:99999;align-items:center;justify-content:center;">
-        <div id="wrpr-pdf-shell" style="background:#fff;width:90%;height:90%;border-radius:8px;overflow:hidden;display:flex;flex-direction:column;">
-          <div id="wrpr-toolbar" style="background:#e60000;color:#fff;padding:8px;text-align:center;">
-            <button id="wrpr-prev">◀</button>
-            <span id="wrpr-page-info">Page <span id="wrpr-page-num">1</span> / <span id="wrpr-page-count">1</span></span>
-            <button id="wrpr-next">▶</button>
-            <button id="wrpr-close" style="float:right;">✕</button>
-          </div>
-          <div id="wrpr-pdf-container" style="flex:1;display:flex;align-items:center;justify-content:center;background:#222;"></div>
+    modal = document.createElement('div');
+    modal.id = 'wrpr-modal';
+    modal.style.display = 'none';
+    modal.setAttribute('aria-hidden', 'true');
+    modal.setAttribute('role', 'dialog');
+    modal.setAttribute('aria-modal', 'true');
+    modal.setAttribute('aria-label', 'PDF reader');
+    modal.innerHTML = `
+      <div id="wrpr-modal-content">
+        <span id="wrpr-close" role="button" aria-label="Close reader">&times;</span>
+        <canvas id="wrpr-pdf-canvas"></canvas>
+        <div class="wrpr-page-info">Loading PDF...</div>
+        <div class="wrpr-nav">
+          <button id="wrpr-prev" type="button" aria-label="Previous page">&#9664;&#9664;</button>
+          <button id="wrpr-next" type="button" aria-label="Next page">&#9654;&#9654;</button>
         </div>
-      </div>`;
-    document.body.insertAdjacentHTML('beforeend', html);
-    modal = document.getElementById('wrpr-modal');
+      </div>
+    `;
+    document.body.appendChild(modal);
   }
 
-  const container = document.getElementById('wrpr-pdf-container');
+  const canvasEl = document.getElementById('wrpr-pdf-canvas');
   const btnPrev = document.getElementById('wrpr-prev');
   const btnNext = document.getElementById('wrpr-next');
   const btnClose = document.getElementById('wrpr-close');
-  const pageNumEl = document.getElementById('wrpr-page-num');
-  const pageCountEl = document.getElementById('wrpr-page-count');
+  const pageInfoEl = modal.querySelector('.wrpr-page-info');
 
   let pdfDoc = null;
   let currentPage = 1;
   let readerId = '';
   let pdfUrl = '';
 
+  function setPageInfo(text) {
+    if (pageInfoEl) {
+      pageInfoEl.textContent = text;
+    }
+  }
+
+  function updatePageInfo() {
+    if (!pdfDoc) {
+      setPageInfo('Loading PDF...');
+      return;
+    }
+    setPageInfo(`Page ${currentPage} / ${pdfDoc.numPages}`);
+  }
+
+  function updateNavState() {
+    const hasDoc = !!pdfDoc;
+    if (btnPrev) {
+      btnPrev.disabled = !hasDoc || currentPage <= 1;
+    }
+    if (btnNext) {
+      btnNext.disabled = !hasDoc || (pdfDoc ? currentPage >= pdfDoc.numPages : true);
+    }
+  }
+
   function showModal() {
     modal.style.display = 'flex';
+    modal.setAttribute('aria-hidden', 'false');
     document.documentElement.style.overflow = 'hidden';
   }
 
   function hideModal() {
     modal.style.display = 'none';
+    modal.setAttribute('aria-hidden', 'true');
     document.documentElement.style.overflow = '';
-    container.innerHTML = '';
+    if (canvasEl) {
+      const ctx = canvasEl.getContext('2d');
+      if (ctx) {
+        ctx.clearRect(0, 0, canvasEl.width, canvasEl.height);
+      }
+    }
     pdfDoc = null;
+    currentPage = 1;
+    updateNavState();
+    setPageInfo('Loading PDF...');
   }
 
   async function renderPage(num) {
-    if (!pdfDoc) return;
+    if (!pdfDoc || !canvasEl) return;
     try {
       const page = await pdfDoc.getPage(num);
       const vp = page.getViewport({ scale: 1 });
       const scale = Math.min((window.innerWidth * 0.9) / vp.width, (window.innerHeight * 0.8) / vp.height);
       const viewport = page.getViewport({ scale });
-      const canvas = document.createElement('canvas');
-      const ctx = canvas.getContext('2d');
-      canvas.width = viewport.width;
-      canvas.height = viewport.height;
-      container.innerHTML = '';
-      container.appendChild(canvas);
-      await page.render({ canvasContext: ctx, viewport }).promise;
+      const ctx = canvasEl.getContext('2d');
+      if (!ctx) {
+        return;
+      }
+      canvasEl.classList.add('wrpr-flip');
+      window.setTimeout(() => canvasEl.classList.remove('wrpr-flip'), 250);
+      const outputScale = window.devicePixelRatio || 1;
+      canvasEl.width = viewport.width * outputScale;
+      canvasEl.height = viewport.height * outputScale;
+      canvasEl.style.width = `${viewport.width}px`;
+      canvasEl.style.height = `${viewport.height}px`;
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.clearRect(0, 0, canvasEl.width, canvasEl.height);
+      const renderContext = { canvasContext: ctx, viewport };
+      if (outputScale !== 1) {
+        renderContext.transform = [outputScale, 0, 0, outputScale, 0, 0];
+      }
+      await page.render(renderContext).promise;
       currentPage = num;
-      pageNumEl.textContent = num;
+      updatePageInfo();
+      updateNavState();
       localStorage.setItem(`wrpr_progress_${readerId}_${pdfUrl}`, num);
     } catch (err) {
-      container.innerHTML = `<div style="color:#fff;">PDF render error: ${err}</div>`;
+      setPageInfo(`PDF render error: ${err.message || err}`);
     }
   }
 
@@ -79,20 +128,23 @@
     readerId = rid;
     pdfUrl = url;
     showModal();
-    container.innerHTML = `<div style="color:#fff;">Loading PDF...</div>`;
+    setPageInfo('Loading PDF...');
+    updateNavState();
     if (!window.pdfjsLib || typeof window.pdfjsLib.getDocument !== 'function') {
-      container.innerHTML = '<div style="color:#f55;">PDF.js is not available.</div>';
+      setPageInfo('PDF.js is not available.');
       return;
     }
     try {
       const loadingTask = window.pdfjsLib.getDocument({ url: pdfUrl });
       pdfDoc = await loadingTask.promise;
-      pageCountEl.textContent = pdfDoc.numPages;
+      updateNavState();
       const stored = parseInt(localStorage.getItem(`wrpr_progress_${rid}_${url}`) || '1', 10);
       const startPage = Number.isFinite(stored) ? Math.min(Math.max(1, stored), pdfDoc.numPages) : 1;
       await renderPage(startPage);
     } catch (err) {
-      container.innerHTML = `<div style="color:#f55;">PDF load error: ${err.message}</div>`;
+      setPageInfo(`PDF load error: ${err.message}`);
+      pdfDoc = null;
+      updateNavState();
     }
   }
 
@@ -121,6 +173,8 @@
   if (btnClose) {
     btnClose.addEventListener('click', hideModal);
   }
+
+  updateNavState();
 
   document
     .querySelector('.wrpr-language-filter')

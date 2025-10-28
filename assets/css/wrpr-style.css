@@ -97,46 +97,129 @@
 #wrpr-modal {
   position: fixed;
   inset: 0;
-  background: rgba(0,0,0,0.85);
-  z-index: 9999;
-  display: flex;
-  align-items: flex-start;
+  display: none;
+  align-items: center;
   justify-content: center;
-  padding-top: 40px;
+  padding: 40px 20px;
+  background: rgba(0, 0, 0, 0.85);
+  z-index: 9999;
   overflow-y: auto;
   animation: wrprFade 0.3s ease;
 }
-#wrpr-pdf-viewer {
-  background: #fff;
-  border-radius: 8px;
-  padding: 10px;
-  max-height: 95vh;
-  overflow: auto;
+
+#wrpr-modal[aria-hidden='true'] {
+  display: none;
 }
+
+#wrpr-modal-content {
+  position: relative;
+  background: #fff;
+  border-radius: 24px;
+  padding: 56px 48px 150px;
+  width: min(90vw, 960px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 28px;
+  box-shadow: 0 32px 80px rgba(0, 0, 0, 0.3);
+}
+
 #wrpr-close {
   position: absolute;
-  top: 20px;
-  right: 30px;
+  top: 24px;
+  right: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   background: #e60000;
   color: #fff;
   border: none;
   border-radius: 50%;
-  width: 36px;
-  height: 36px;
-  font-size: 20px;
+  width: 40px;
+  height: 40px;
+  font-size: 22px;
   cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 
-#wrpr-modal canvas {
-  width: 90% !important;
-  max-width: 800px;
-  margin: 0 auto;
-  border-radius: 12px;
+#wrpr-close:hover {
+  transform: scale(1.05);
+  box-shadow: 0 10px 25px rgba(230, 0, 0, 0.35);
+}
+
+#wrpr-pdf-canvas {
+  width: auto;
+  max-width: 100%;
+  height: auto;
+  display: block;
+  border-radius: 16px;
   background: #fff;
-  box-shadow: 0 2px 10px rgba(0,0,0,0.15);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.18);
+  transition: transform 0.3s ease, filter 0.3s ease;
+}
+
+#wrpr-pdf-canvas.wrpr-flip {
+  transform: scale(0.98) rotateY(4deg);
+  filter: brightness(0.9);
 }
 
 @keyframes wrprFade {
   from { opacity: 0; transform: scale(0.95); }
   to { opacity: 1; transform: scale(1); }
+}
+
+/* Navigation buttons - clean modern style */
+.wrpr-nav {
+  position: absolute;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  z-index: 9999;
+}
+
+.wrpr-nav button {
+  width: 60px;
+  height: 60px;
+  border: none;
+  border-radius: 50%;
+  background-color: #e60000;
+  color: #fff;
+  font-size: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  transition: all 0.25s ease;
+}
+
+.wrpr-nav button:hover {
+  transform: scale(1.1);
+  background-color: #cc0000;
+}
+
+.wrpr-nav button:disabled,
+.wrpr-nav button:disabled:hover {
+  background-color: #b9b9b9;
+  color: #fff;
+  cursor: not-allowed;
+  box-shadow: none;
+  transform: none;
+  opacity: 0.65;
+}
+
+.wrpr-page-info {
+  position: absolute;
+  bottom: 90px;
+  left: 50%;
+  transform: translateX(-50%);
+  color: #444;
+  font-weight: 500;
+  background: rgba(255,255,255,0.8);
+  padding: 6px 14px;
+  border-radius: 10px;
+  font-size: 14px;
 }
