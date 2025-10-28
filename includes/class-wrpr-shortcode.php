@@ -59,7 +59,7 @@ class WRPR_Shortcode {
             <div class="wrpr-header">
                 <h2><?php echo esc_html( $reader['name'] ); ?></h2>
                 <div class="wrpr-header-controls">
-                    <select class="wrpr-language-filter">
+                    <select class="wrpr-lang-select">
                         <option value="All">All Languages</option>
                         <?php foreach ( $langs as $lang ) : ?>
                             <option value="<?php echo esc_attr( $lang ); ?>"><?php echo esc_html( $lang ); ?></option>
