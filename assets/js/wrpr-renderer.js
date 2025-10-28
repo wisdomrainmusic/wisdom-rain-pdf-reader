@@ -21,12 +21,13 @@
     modal.setAttribute('aria-label', 'PDF reader');
     modal.innerHTML = `
       <div id="wrpr-modal-content">
-        <span id="wrpr-close" role="button" aria-label="Close reader">&times;</span>
+        <span id="wrpr-close">&times;</span>
         <canvas id="wrpr-pdf-canvas"></canvas>
-        <div class="wrpr-page-info">Loading PDF...</div>
+        <div class="wrpr-page-info">Page 1</div>
         <div class="wrpr-nav">
-          <button id="wrpr-prev" type="button" aria-label="Previous page">&#9664;&#9664;</button>
-          <button id="wrpr-next" type="button" aria-label="Next page">&#9654;&#9654;</button>
+          <button id="wrpr-prev"><i class="fas fa-backward"></i></button>
+          <button id="wrpr-play" class="wrpr-play"><i class="fas fa-play"></i></button>
+          <button id="wrpr-next"><i class="fas fa-forward"></i></button>
         </div>
       </div>
     `;

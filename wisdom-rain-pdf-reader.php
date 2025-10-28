@@ -56,6 +56,13 @@ function wrpr_enqueue_assets() {
         true
     );
 
+    wp_enqueue_style(
+        'font-awesome',
+        'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css',
+        [],
+        '6.5.0'
+    );
+
     // 3️⃣ Stil dosyası
     wp_enqueue_style(
         'wrpr-style',
