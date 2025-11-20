@@ -1,6 +1,6 @@
-/* === WISDOM RAIN READER – FINAL FULL PREMIUM SAFE VERSION === */
+/* === WISDOM RAIN READER – FINAL PREMIUM RESPONSIVE VERSION (v5.0 Altın Set) === */
 
-/* ---- Genel Alan ---- */
+/* ---- ROOT SAFE AREAS ---- */
 :root {
   --wrpr-safe-area-top: env(safe-area-inset-top, 0px);
   --wrpr-safe-area-right: env(safe-area-inset-right, 0px);
@@ -8,6 +8,7 @@
   --wrpr-safe-area-left: env(safe-area-inset-left, 0px);
 }
 
+/* ---- FRONT LIST VIEW ---- */
 .wrpr-reader-wrapper {
   font-family: "Cinzel", "Cormorant Garamond", serif;
   padding: 20px;
@@ -15,7 +16,7 @@
   color: #f7e7c6;
 }
 
-/* ---- Üst Başlık Alanı ---- */
+/* ---- HEADER ---- */
 .wrpr-header {
   display: flex;
   justify-content: space-between;
@@ -43,7 +44,7 @@
   outline: none;
 }
 
-/* ---- Kitap Listesi ---- */
+/* ---- BOOK LIST ---- */
 .wrpr-book-list {
   display: flex;
   flex-direction: column;
@@ -91,7 +92,7 @@
   opacity: 0.9;
 }
 
-/* ---- Butonlar ---- */
+/* ---- CTA BUTTONS ---- */
 .wrpr-open-btn,
 .wrpr-book-card button,
 .wrpr-open-btn[disabled],
@@ -105,7 +106,6 @@
   cursor: pointer !important;
   transition: all 0.3s ease !important;
   box-shadow: 0 0 18px rgba(255, 215, 128, 0.25) !important;
-  opacity: 1 !important;
 }
 .wrpr-open-btn:hover,
 .wrpr-book-card button:hover {
@@ -120,9 +120,8 @@
   border: 1px solid rgba(255, 215, 150, 0.5);
   padding: 8px 14px;
   border-radius: 8px;
-  font-weight: bold;
   text-decoration: none;
-  margin-left: 8px;
+  font-weight: bold;
   transition: all 0.3s ease;
 }
 .wrpr-buy-link:hover {
@@ -131,7 +130,7 @@
   box-shadow: 0 0 25px rgba(255, 230, 160, 0.35);
 }
 
-/* ---- Modal (Reader Alanı) ---- */
+/* ---- MODAL ---- */
 #wrpr-modal {
   position: fixed;
   inset: 0;
@@ -142,17 +141,18 @@
   background: rgba(0, 0, 0, 0.9);
   z-index: 9999;
   overflow-y: auto;
-  animation: wrprFade 0.3s ease;
 }
 #wrpr-modal[aria-hidden="true"] {
   display: none;
 }
+
 #wrpr-modal-content {
   position: relative;
   background: #0e0d0b;
   border-radius: 24px;
   padding: 56px 48px 150px;
   width: min(90vw, 960px);
+  max-height: calc(100vh - 40px);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -160,56 +160,82 @@
   border: 1px solid rgba(255, 215, 150, 0.2);
   box-shadow: 0 0 45px rgba(255, 215, 128, 0.15);
   z-index: 9999;
+  overflow: hidden; /* zoom + pan taşınca dışı görünmesin */
 }
 
-/* ---- Close Butonu ---- */
+/* ---- FIXED CLOSE BUTTON ---- */
 #wrpr-close {
-  position: absolute;
-  top: 24px;
-  right: 28px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  position: fixed !important;
+  top: calc(20px + var(--wrpr-safe-area-top)) !important;
+  right: calc(20px + var(--wrpr-safe-area-right)) !important;
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
   background: linear-gradient(145deg, #b8860b, #ffcc70);
   color: #000;
   border: none;
-  border-radius: 50%;
-  width: 40px;
-  height: 40px;
-  font-size: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   cursor: pointer;
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  font-size: 22px;
   box-shadow: 0 0 15px rgba(255, 215, 130, 0.35);
+  transition: transform 0.2s ease;
+  z-index: 1000000;
 }
 #wrpr-close:hover {
-  transform: scale(1.1);
-  background: linear-gradient(145deg, #ffda85, #b8860b);
+  transform: scale(1.12);
 }
 
-/* ---- PDF Canvas ---- */
+/* ---- MOBILE CLOSE BUTTON ---- */
+@media (max-width: 768px) {
+  #wrpr-close {
+    width: 38px;
+    height: 38px;
+    font-size: 20px;
+    top: calc(12px + var(--wrpr-safe-area-top));
+    right: calc(12px + var(--wrpr-safe-area-right));
+  }
+}
+@media (max-width: 480px) {
+  #wrpr-close {
+    width: 34px;
+    height: 34px;
+    font-size: 18px;
+    top: calc(8px + var(--wrpr-safe-area-top));
+    right: calc(8px + var(--wrpr-safe-area-right));
+  }
+}
+
+/* ---- PDF CANVAS (RESPONSIVE FIX) ---- */
 #wrpr-pdf-canvas {
   width: auto;
-  max-width: 100%;
+  max-width: 100vw !important;
+  max-height: 85vh !important;
   height: auto;
   display: block;
-  border-radius: 16px;
   background: #fff;
+  border-radius: 16px;
   box-shadow: 0 5px 25px rgba(0, 0, 0, 0.15);
-  opacity: 1;
+  transition: opacity 0.2s ease, transform 0.1s linear;
 }
 
-/* ---- Navigasyon ---- */
+/* Fade state JS için */
+.wrpr-canvas-fade-out {
+  opacity: 0;
+}
+
+/* ---- NAVIGATION ---- */
 .wrpr-nav {
   position: absolute;
   bottom: 60px;
   left: 50%;
   transform: translateX(-50%);
   display: flex;
-  align-items: center;
-  justify-content: center;
   gap: 20px;
   z-index: 10000;
 }
+
 .wrpr-nav button {
   width: 55px;
   height: 55px;
@@ -218,51 +244,79 @@
   background: linear-gradient(145deg, #b8860b, #ffcc70);
   color: #000;
   font-size: 22px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
   box-shadow: 0 12px 20px rgba(255, 215, 150, 0.25);
   cursor: pointer;
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  transition: transform 0.2s ease;
 }
 .wrpr-nav button:hover {
   transform: translateY(-2px);
-  box-shadow: 0 14px 22px rgba(255, 220, 160, 0.35);
 }
 
-/* ---- Sayfa Bilgisi ---- */
+/* ---- PAGE INFO ---- */
 .wrpr-page-info {
   position: absolute;
   bottom: 120px;
   left: 50%;
   transform: translateX(-50%);
-  color: #f5d78c;
-  font-size: 13px;
-  font-weight: 500;
-  background: rgba(25, 20, 15, 0.8);
   padding: 4px 10px;
+  font-size: 13px;
+  background: rgba(25, 20, 15, 0.85);
   border-radius: 8px;
+  color: #f5d78c;
   box-shadow: 0 0 12px rgba(255, 215, 150, 0.2);
 }
 
-/* ---- Mobil ---- */
+/* ---- RESPONSIVE FRONT SECTION ---- */
 @media (max-width: 1024px) {
   #wrpr-modal-content {
     width: 92% !important;
-    border-radius: 20px;
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
   }
   .wrpr-book-card {
     flex-direction: column;
-    align-items: center;
     text-align: center;
   }
   .wrpr-book-card img {
     width: 90px;
     height: 90px;
-    border-radius: 10px;
   }
-  .wrpr-book-card .wrpr-buy-link {
-    margin-top: 8px;
+}
+
+/* ================================================================= */
+/* === DESKTOP FULLSCREEN BUTTON (ONLY DESKTOP) ==================== */
+/* ================================================================= */
+
+/* Varsayılan: hiçbir yerde gösterme */
+.wrpr-fs-btn {
+  display: none;
+}
+
+@media (min-width: 1025px) {
+  .wrpr-fs-btn {
+    position: fixed !important;
+    top: calc(20px + var(--wrpr-safe-area-top)) !important;
+    left: calc(20px + var(--wrpr-safe-area-left)) !important;
+    width: 48px !important;
+    height: 48px !important;
+    font-size: 26px !important;
+
+    background: rgba(255, 208, 130, 0.85) !important;
+    border-radius: 50% !important;
+    border: 1px solid rgba(255, 215, 160, 0.4);
+    backdrop-filter: blur(4px);
+
+    display: flex !important;
+    align-items: center;
+    justify-content: center;
+
+    cursor: pointer;
+    z-index: 999999 !important;
+    box-shadow: 0 0 22px rgba(255, 215, 150, 0.45);
+    transition: 0.2s ease;
+  }
+
+  .wrpr-fs-btn:hover {
+    background: rgba(255, 230, 160, 1) !important;
+    transform: scale(1.08);
+    box-shadow: 0 0 30px rgba(255, 225, 150, 0.55);
   }
 }
