@@ -1,4 +1,4 @@
-/* === WISDOM RAIN READER – FINAL PREMIUM RESPONSIVE VERSION (v5.0 Altın Set) === */
+/* === WISDOM RAIN READER – FINAL PREMIUM RESPONSIVE VERSION (v4.3 – Mobile FS Left) === */
 
 /* ---- ROOT SAFE AREAS ---- */
 :root {
@@ -152,7 +152,6 @@
   border-radius: 24px;
   padding: 56px 48px 150px;
   width: min(90vw, 960px);
-  max-height: calc(100vh - 40px);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -160,10 +159,9 @@
   border: 1px solid rgba(255, 215, 150, 0.2);
   box-shadow: 0 0 45px rgba(255, 215, 128, 0.15);
   z-index: 9999;
-  overflow: hidden; /* zoom + pan taşınca dışı görünmesin */
 }
 
-/* ---- FIXED CLOSE BUTTON ---- */
+/* ---- FIXED CLOSE BUTTON (RIGHT) ---- */
 #wrpr-close {
   position: fixed !important;
   top: calc(20px + var(--wrpr-safe-area-top)) !important;
@@ -181,7 +179,7 @@
   font-size: 22px;
   box-shadow: 0 0 15px rgba(255, 215, 130, 0.35);
   transition: transform 0.2s ease;
-  z-index: 1000000;
+  z-index: 999999;
 }
 #wrpr-close:hover {
   transform: scale(1.12);
@@ -217,12 +215,6 @@
   background: #fff;
   border-radius: 16px;
   box-shadow: 0 5px 25px rgba(0, 0, 0, 0.15);
-  transition: opacity 0.2s ease, transform 0.1s linear;
-}
-
-/* Fade state JS için */
-.wrpr-canvas-fade-out {
-  opacity: 0;
 }
 
 /* ---- NAVIGATION ---- */
@@ -282,41 +274,47 @@
 }
 
 /* ================================================================= */
-/* === DESKTOP FULLSCREEN BUTTON (ONLY DESKTOP) ==================== */
+/* === FULLSCREEN BUTTON – LEFT TOP (MOBILE + DESKTOP) ============= */
 /* ================================================================= */
 
-/* Varsayılan: hiçbir yerde gösterme */
 .wrpr-fs-btn {
-  display: none;
+  position: fixed !important;
+  /* solda – kapama butonundan tamamen ayrı */
+  top: calc(16px + var(--wrpr-safe-area-top)) !important;
+  left: calc(16px + var(--wrpr-safe-area-left)) !important;
+
+  width: 40px !important;
+  height: 40px !important;
+  font-size: 22px !important;
+
+  background: rgba(255, 208, 130, 0.9) !important;
+  border-radius: 50% !important;
+  border: 1px solid rgba(255, 215, 160, 0.4);
+  backdrop-filter: blur(4px);
+
+  display: flex !important;
+  align-items: center;
+  justify-content: center;
+
+  cursor: pointer;
+  z-index: 999998 !important;
+  box-shadow: 0 0 18px rgba(255, 215, 150, 0.4);
+  transition: 0.2s ease;
 }
 
+.wrpr-fs-btn:hover {
+  background: rgba(255, 230, 160, 1) !important;
+  transform: scale(1.06);
+  box-shadow: 0 0 26px rgba(255, 225, 150, 0.55);
+}
+
+/* Desktop’ta biraz büyütelim */
 @media (min-width: 1025px) {
   .wrpr-fs-btn {
-    position: fixed !important;
-    top: calc(20px + var(--wrpr-safe-area-top)) !important;
-    left: calc(20px + var(--wrpr-safe-area-left)) !important;
-    width: 48px !important;
-    height: 48px !important;
-    font-size: 26px !important;
-
-    background: rgba(255, 208, 130, 0.85) !important;
-    border-radius: 50% !important;
-    border: 1px solid rgba(255, 215, 160, 0.4);
-    backdrop-filter: blur(4px);
-
-    display: flex !important;
-    align-items: center;
-    justify-content: center;
-
-    cursor: pointer;
-    z-index: 999999 !important;
-    box-shadow: 0 0 22px rgba(255, 215, 150, 0.45);
-    transition: 0.2s ease;
-  }
-
-  .wrpr-fs-btn:hover {
-    background: rgba(255, 230, 160, 1) !important;
-    transform: scale(1.08);
-    box-shadow: 0 0 30px rgba(255, 225, 150, 0.55);
+    top: 24px !important;
+    left: 24px !important;
+    width: 46px !important;
+    height: 46px !important;
+    font-size: 24px !important;
   }
 }
