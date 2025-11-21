@@ -20,9 +20,62 @@
   let readerId = '';
   let htmlUrl = '';
   let progressKey = '';
+  let pageSource = null;
 
   function setPageInfo(text) {
     if (pageInfoEl) pageInfoEl.textContent = text;
+  }
+
+  function calculatePageLimit() {
+    const isMobile = window.innerWidth <= 600;
+    const maxHeight = Math.max(320, Math.floor(window.innerHeight * (isMobile ? 0.8 : 0.85)));
+    return isMobile ? maxHeight : Math.min(Math.max(720, maxHeight), 780);
+  }
+
+  function splitIntoPages(htmlContent, pageHeightLimit) {
+    const limit = Math.max(200, pageHeightLimit || 760);
+    const pages = [];
+
+    const measurementContainer = document.createElement('div');
+    measurementContainer.style.position = 'fixed';
+    measurementContainer.style.visibility = 'hidden';
+    measurementContainer.style.pointerEvents = 'none';
+    measurementContainer.style.left = '-9999px';
+    measurementContainer.style.top = '-9999px';
+    measurementContainer.style.width = '100%';
+    measurementContainer.style.opacity = '0';
+
+    document.body.appendChild(measurementContainer);
+
+    let currentPageEl = document.createElement('div');
+    currentPageEl.className = 'wr-page';
+    measurementContainer.appendChild(currentPageEl);
+
+    Array.from(htmlContent.childNodes).forEach((node) => {
+      if (node.nodeType === Node.TEXT_NODE && !node.textContent.trim()) return;
+
+      const clone = node.cloneNode(true);
+      currentPageEl.appendChild(clone);
+
+      if (currentPageEl.scrollHeight > limit) {
+        currentPageEl.removeChild(currentPageEl.lastChild);
+
+        if (currentPageEl.childNodes.length) {
+          pages.push(currentPageEl.cloneNode(true));
+          currentPageEl.innerHTML = '';
+          currentPageEl.appendChild(clone);
+        } else {
+          // If a single element exceeds the limit, force it onto its own page
+          currentPageEl.appendChild(clone);
+        }
+      }
+    });
+
+    pages.push(currentPageEl.cloneNode(true));
+
+    document.body.removeChild(measurementContainer);
+
+    return pages;
   }
 
   function updateNavState() {
@@ -44,6 +97,7 @@
     readerId = '';
     htmlUrl = '';
     progressKey = '';
+    pageSource = null;
   }
 
   function hideModal() {
@@ -94,17 +148,24 @@
     updateNavState();
   }
 
-  function extractPages(html) {
-    const temp = document.createElement('div');
-    temp.innerHTML = html;
-    const pageNodes = temp.querySelectorAll('.wr-page');
-    if (pageNodes.length) return Array.from(pageNodes);
+  function buildPagesFromSource() {
+    if (!pageSource) return [];
 
-    // If the source has no explicit pages, wrap the entire content as one page.
-    const fallback = document.createElement('div');
-    fallback.className = 'wr-page';
-    fallback.innerHTML = temp.innerHTML;
-    return [fallback];
+    const explicitPages = pageSource.querySelectorAll('.wr-page');
+    if (explicitPages.length) {
+      return Array.from(explicitPages).map((page) => page.cloneNode(true));
+    }
+
+    const limit = calculatePageLimit();
+    return splitIntoPages(pageSource, limit);
+  }
+
+  function paginateFromSource(targetIndex = 0) {
+    if (!pageSource) return;
+
+    WR_PAGES = buildPagesFromSource();
+    const safeIndex = Math.min(Math.max(0, targetIndex), WR_PAGES.length - 1);
+    renderPage(safeIndex);
   }
 
   async function openHTMLReader(url, rid) {
@@ -123,8 +184,12 @@
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const html = await response.text();
 
-      WR_PAGES = extractPages(html);
-      const startIndex = Math.min(restoreProgress(WR_PAGES.length), WR_PAGES.length - 1);
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(html, 'text/html');
+      pageSource = doc.body || doc.documentElement;
+
+      WR_PAGES = buildPagesFromSource();
+      const startIndex = Math.min(restoreProgress(WR_PAGES.length), Math.max(WR_PAGES.length - 1, 0));
       renderPage(startIndex);
     } catch (err) {
       console.error('WRPR load error', err);
@@ -140,6 +205,12 @@
     if (!readerContent || !modalContent) return;
     const maxHeight = Math.max(200, Math.floor(window.innerHeight * 0.85));
     readerContent.style.maxHeight = `${maxHeight}px`;
+  }
+
+  function repaginateOnResize() {
+    if (!pageSource || modal.getAttribute('aria-hidden') === 'true') return;
+    const target = Math.min(currentPage, Math.max(WR_PAGES.length - 1, 0));
+    paginateFromSource(target);
   }
 
   if (btnPrev) {
@@ -197,6 +268,12 @@
   document.querySelectorAll('.wrpr-reader-wrapper').forEach((wrapper) => bindReader(wrapper));
 
   syncReaderHeight();
-  window.addEventListener('resize', syncReaderHeight);
-  window.addEventListener('orientationchange', syncReaderHeight);
+  window.addEventListener('resize', () => {
+    syncReaderHeight();
+    repaginateOnResize();
+  });
+  window.addEventListener('orientationchange', () => {
+    syncReaderHeight();
+    repaginateOnResize();
+  });
 })();

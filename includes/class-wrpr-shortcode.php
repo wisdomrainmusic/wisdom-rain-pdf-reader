@@ -80,7 +80,7 @@ class WRPR_Shortcode {
                             <button class="wrpr-read-btn"
                                 data-html="<?php echo esc_url( $pdf_url ); ?>"
                                 data-reader="<?php echo esc_attr( $reader_id ); ?>">
-                                Read PDF
+                                Read
                             </button>
 
                             <?php if ( ! empty( $buy_link ) ) : ?>
