@@ -78,7 +78,7 @@ class WRPR_Shortcode {
 
                         <div class="wrpr-actions">
                             <button class="wrpr-read-btn"
-                                data-pdf="<?php echo esc_url( $pdf_url ); ?>"
+                                data-html="<?php echo esc_url( $pdf_url ); ?>"
                                 data-reader="<?php echo esc_attr( $reader_id ); ?>">
                                 Read PDF
                             </button>
