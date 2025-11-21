@@ -38,20 +38,10 @@ function wrpr_load_textdomain() {
 }
 
 function wrpr_enqueue_assets() {
-    // 1️⃣ PDF.js CDN
-    wp_enqueue_script(
-        'pdfjs',
-        'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js',
-        [],
-        null,
-        true
-    );
-
-    // 2️⃣ Renderer JS (bizim PDF okuma motoru)
     wp_enqueue_script(
         'wrpr-renderer',
         plugin_dir_url(__FILE__) . 'assets/js/wrpr-renderer.js',
-        ['pdfjs'],
+        [],
         time(), // cache-bypass
         true
     );
@@ -82,7 +72,7 @@ function wrpr_render_modal_shell() {
     <div id="wrpr-modal" aria-hidden="true" role="dialog" aria-modal="true" aria-label="<?php echo esc_attr__( 'PDF reader', 'wrpr' ); ?>">
         <div id="wrpr-modal-content">
             <button type="button" id="wrpr-close" aria-label="<?php echo esc_attr__( 'Close reader', 'wrpr' ); ?>">&times;</button>
-            <canvas id="wrpr-pdf-canvas"></canvas>
+            <div id="wrpr-reader-content" class="wrpr-reader-content"></div>
             <div class="wrpr-page-info"><?php echo esc_html__( 'Page 1', 'wrpr' ); ?></div>
             <div class="wrpr-nav">
                 <button type="button" id="wrpr-prev" aria-label="<?php echo esc_attr__( 'Previous page', 'wrpr' ); ?>">
