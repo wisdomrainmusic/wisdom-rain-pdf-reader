@@ -10,8 +10,8 @@
 
   const modalContent = modal.querySelector('#wrpr-modal-content');
   const readerContent = modal.querySelector('#wrpr-reader-content');
-  const btnPrev = modal.querySelector('#wrpr-prev');
-  const btnNext = modal.querySelector('#wrpr-next');
+  const btnPrev = modal.querySelector('#wrpr-prev-page, #wrpr-prev');
+  const btnNext = modal.querySelector('#wrpr-next-page, #wrpr-next');
   const btnClose = modal.querySelector('#wrpr-close');
   const pageInfoEl = modal.querySelector('.wrpr-page-info');
 
@@ -32,46 +32,56 @@
     return isMobile ? maxHeight : Math.min(Math.max(720, maxHeight), 780);
   }
 
-  function splitIntoPages(htmlContent, pageHeightLimit) {
-    const limit = Math.max(200, pageHeightLimit || 760);
+  function splitIntoPages(htmlElement, pageHeightLimit) {
+    const limit = Math.max(200, pageHeightLimit || calculatePageLimit());
     const pages = [];
 
     const measurementContainer = document.createElement('div');
-    measurementContainer.style.position = 'fixed';
+    measurementContainer.style.position = 'absolute';
     measurementContainer.style.visibility = 'hidden';
     measurementContainer.style.pointerEvents = 'none';
-    measurementContainer.style.left = '-9999px';
-    measurementContainer.style.top = '-9999px';
-    measurementContainer.style.width = '100%';
+    measurementContainer.style.left = '0';
+    measurementContainer.style.top = '0';
+    measurementContainer.style.width = readerContent ? `${readerContent.clientWidth || readerContent.offsetWidth || 640}px` : '100%';
     measurementContainer.style.opacity = '0';
 
     document.body.appendChild(measurementContainer);
 
-    let currentPageEl = document.createElement('div');
-    currentPageEl.className = 'wr-page';
-    measurementContainer.appendChild(currentPageEl);
+    const createPage = (seedNode = null) => {
+      const page = document.createElement('div');
+      page.className = 'wr-page';
+      if (seedNode) page.appendChild(seedNode);
+      measurementContainer.appendChild(page);
+      return page;
+    };
 
-    Array.from(htmlContent.childNodes).forEach((node) => {
+    let workingPage = createPage();
+
+    Array.from(htmlElement.childNodes).forEach((node) => {
       if (node.nodeType === Node.TEXT_NODE && !node.textContent.trim()) return;
 
       const clone = node.cloneNode(true);
-      currentPageEl.appendChild(clone);
+      workingPage.appendChild(clone);
 
-      if (currentPageEl.scrollHeight > limit) {
-        currentPageEl.removeChild(currentPageEl.lastChild);
+      if (workingPage.scrollHeight > limit) {
+        workingPage.removeChild(clone);
 
-        if (currentPageEl.childNodes.length) {
-          pages.push(currentPageEl.cloneNode(true));
-          currentPageEl.innerHTML = '';
-          currentPageEl.appendChild(clone);
-        } else {
-          // If a single element exceeds the limit, force it onto its own page
-          currentPageEl.appendChild(clone);
+        if (workingPage.childNodes.length) {
+          pages.push(workingPage.cloneNode(true));
+          workingPage.replaceChildren();
+          workingPage.appendChild(clone);
+        }
+
+        if (workingPage.scrollHeight > limit) {
+          pages.push(workingPage.cloneNode(true));
+          workingPage.replaceChildren();
         }
       }
     });
 
-    pages.push(currentPageEl.cloneNode(true));
+    if (workingPage.childNodes.length) {
+      pages.push(workingPage.cloneNode(true));
+    }
 
     document.body.removeChild(measurementContainer);
 
@@ -105,7 +115,7 @@
     modal.setAttribute('aria-hidden', 'true');
     document.documentElement.style.overflow = '';
     clearReader();
-    setPageInfo('Page 1');
+    setPageInfo('Page 1 / 1');
     updateNavState();
   }
 
@@ -131,7 +141,13 @@
   }
 
   function renderPage(index) {
-    if (!readerContent || !WR_PAGES.length) return;
+    if (!readerContent) return;
+    if (!WR_PAGES.length) {
+      readerContent.innerHTML = '<div class="wr-page"><p>No content available.</p></div>';
+      setPageInfo('Page 0 / 0');
+      updateNavState();
+      return;
+    }
     const page = WR_PAGES[index];
     if (!page) return;
 
@@ -148,23 +164,12 @@
     updateNavState();
   }
 
-  function buildPagesFromSource() {
-    if (!pageSource) return [];
-
-    const explicitPages = pageSource.querySelectorAll('.wr-page');
-    if (explicitPages.length) {
-      return Array.from(explicitPages).map((page) => page.cloneNode(true));
-    }
-
-    const limit = calculatePageLimit();
-    return splitIntoPages(pageSource, limit);
-  }
-
   function paginateFromSource(targetIndex = 0) {
     if (!pageSource) return;
 
-    WR_PAGES = buildPagesFromSource();
-    const safeIndex = Math.min(Math.max(0, targetIndex), WR_PAGES.length - 1);
+    const limit = calculatePageLimit();
+    WR_PAGES = splitIntoPages(pageSource, limit);
+    const safeIndex = Math.min(Math.max(0, targetIndex), Math.max(WR_PAGES.length - 1, 0));
     renderPage(safeIndex);
   }
 
@@ -188,7 +193,7 @@
       const doc = parser.parseFromString(html, 'text/html');
       pageSource = doc.body || doc.documentElement;
 
-      WR_PAGES = buildPagesFromSource();
+      WR_PAGES = splitIntoPages(pageSource, calculatePageLimit());
       const startIndex = Math.min(restoreProgress(WR_PAGES.length), Math.max(WR_PAGES.length - 1, 0));
       renderPage(startIndex);
     } catch (err) {
