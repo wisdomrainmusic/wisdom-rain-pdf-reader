@@ -20,21 +20,15 @@
   let readerId = '';
   let htmlUrl = '';
   let progressKey = '';
-  let pageSource = null;
+  let isMobile = window.innerWidth <= 600;
 
   function setPageInfo(text) {
     if (pageInfoEl) pageInfoEl.textContent = text;
   }
 
-  function calculatePageLimit() {
-    const isMobile = window.innerWidth <= 600;
-    const maxHeight = Math.max(320, Math.floor(window.innerHeight * (isMobile ? 0.8 : 0.85)));
-    return isMobile ? maxHeight : Math.min(Math.max(720, maxHeight), 780);
-  }
-
-  function splitIntoPages(htmlElement, pageHeightLimit) {
-    const limit = Math.max(200, pageHeightLimit || calculatePageLimit());
+  function paginateFixed(bodyElement, pageHeight) {
     const pages = [];
+    const source = bodyElement.cloneNode(true);
 
     const measurementContainer = document.createElement('div');
     measurementContainer.style.position = 'absolute';
@@ -42,45 +36,47 @@
     measurementContainer.style.pointerEvents = 'none';
     measurementContainer.style.left = '0';
     measurementContainer.style.top = '0';
-    measurementContainer.style.width = readerContent ? `${readerContent.clientWidth || readerContent.offsetWidth || 640}px` : '100%';
+    measurementContainer.style.width = readerContent
+      ? `${readerContent.clientWidth || readerContent.offsetWidth || 640}px`
+      : '100%';
     measurementContainer.style.opacity = '0';
 
     document.body.appendChild(measurementContainer);
 
-    const createPage = (seedNode = null) => {
+    const createPage = () => {
       const page = document.createElement('div');
       page.className = 'wr-page';
-      if (seedNode) page.appendChild(seedNode);
       measurementContainer.appendChild(page);
       return page;
     };
 
     let workingPage = createPage();
 
-    Array.from(htmlElement.childNodes).forEach((node) => {
+    Array.from(source.childNodes).forEach((node) => {
       if (node.nodeType === Node.TEXT_NODE && !node.textContent.trim()) return;
 
       const clone = node.cloneNode(true);
       workingPage.appendChild(clone);
 
-      if (workingPage.scrollHeight > limit) {
+      if (workingPage.scrollHeight > pageHeight) {
         workingPage.removeChild(clone);
 
         if (workingPage.childNodes.length) {
-          pages.push(workingPage.cloneNode(true));
-          workingPage.replaceChildren();
-          workingPage.appendChild(clone);
+          pages.push(workingPage.outerHTML);
+          workingPage = createPage();
         }
 
-        if (workingPage.scrollHeight > limit) {
-          pages.push(workingPage.cloneNode(true));
-          workingPage.replaceChildren();
+        workingPage.appendChild(clone);
+
+        if (workingPage.scrollHeight > pageHeight || workingPage.childNodes.length === 1) {
+          pages.push(workingPage.outerHTML);
+          workingPage = createPage();
         }
       }
     });
 
     if (workingPage.childNodes.length) {
-      pages.push(workingPage.cloneNode(true));
+      pages.push(workingPage.outerHTML);
     }
 
     document.body.removeChild(measurementContainer);
@@ -107,7 +103,6 @@
     readerId = '';
     htmlUrl = '';
     progressKey = '';
-    pageSource = null;
   }
 
   function hideModal() {
@@ -148,29 +143,26 @@
       updateNavState();
       return;
     }
-    const page = WR_PAGES[index];
-    if (!page) return;
 
-    const clone = page.cloneNode(true);
-    clone.setAttribute('data-page', index + 1);
-    if (!clone.classList.contains('wr-page')) clone.classList.add('wr-page');
+    const pageHTML = WR_PAGES[index];
+    if (!pageHTML) return;
+
+    const wrapper = document.createElement('div');
+    wrapper.innerHTML = pageHTML;
+    const pageEl = wrapper.firstElementChild;
+
+    if (pageEl) {
+      pageEl.setAttribute('data-page', index + 1);
+      if (!pageEl.classList.contains('wr-page')) pageEl.classList.add('wr-page');
+    }
 
     readerContent.innerHTML = '';
-    readerContent.appendChild(clone);
+    if (pageEl) readerContent.appendChild(pageEl);
 
     currentPage = index;
     setPageInfo(`Page ${index + 1} / ${WR_PAGES.length}`);
     saveProgress();
     updateNavState();
-  }
-
-  function paginateFromSource(targetIndex = 0) {
-    if (!pageSource) return;
-
-    const limit = calculatePageLimit();
-    WR_PAGES = splitIntoPages(pageSource, limit);
-    const safeIndex = Math.min(Math.max(0, targetIndex), Math.max(WR_PAGES.length - 1, 0));
-    renderPage(safeIndex);
   }
 
   async function openHTMLReader(url, rid) {
@@ -179,6 +171,8 @@
     progressKey = `wrpr_page_${readerId || 'default'}`;
 
     if (!htmlUrl) return;
+
+    isMobile = window.innerWidth <= 600;
 
     showModal();
     setPageInfo('Loading...');
@@ -191,9 +185,10 @@
 
       const parser = new DOMParser();
       const doc = parser.parseFromString(html, 'text/html');
-      pageSource = doc.body || doc.documentElement;
+      const body = doc.body || doc.documentElement;
+      const PAGE_HEIGHT = isMobile ? 1100 : 1400;
 
-      WR_PAGES = splitIntoPages(pageSource, calculatePageLimit());
+      WR_PAGES = paginateFixed(body, PAGE_HEIGHT);
       const startIndex = Math.min(restoreProgress(WR_PAGES.length), Math.max(WR_PAGES.length - 1, 0));
       renderPage(startIndex);
     } catch (err) {
@@ -213,9 +208,7 @@
   }
 
   function repaginateOnResize() {
-    if (!pageSource || modal.getAttribute('aria-hidden') === 'true') return;
-    const target = Math.min(currentPage, Math.max(WR_PAGES.length - 1, 0));
-    paginateFromSource(target);
+    isMobile = window.innerWidth <= 600;
   }
 
   if (btnPrev) {
@@ -247,7 +240,7 @@
     wrapper.querySelectorAll('.wrpr-read-btn').forEach((btn) => {
       btn.addEventListener('click', (event) => {
         event.preventDefault();
-        const html = btn.dataset.html || btn.dataset.pdf || '';
+        const html = btn.dataset.html || '';
         if (!html) return;
         const rid = btn.dataset.reader || wrapperReaderId || 'default';
         openHTMLReader(html, rid);
