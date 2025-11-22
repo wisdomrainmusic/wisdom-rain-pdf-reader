@@ -249,9 +249,24 @@
   text-align: center;
 }
 
+.wr-page:first-child p:first-of-type {
+  opacity: 1 !important;
+  font-size: 32px !important;
+  font-weight: 700 !important;
+  text-align: center !important;
+  margin-top: 80px !important;
+}
+
 .wr-page p:first-child strong {
   display: inline-block;
   margin-top: 24px;
+}
+
+@media (max-width: 600px) {
+  .wr-page:first-child p:first-of-type {
+    font-size: 24px !important;
+    margin-top: 40px !important;
+  }
 }
 
 .wr-page h1, .wr-page h2, .wr-page h3 {
