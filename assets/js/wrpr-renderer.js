@@ -553,15 +553,19 @@ function wrprApplyGoogleLanguage(lang) {
     const wrapperReaderId = wrapper.dataset.readerId || '';
     const bookCards = [...wrapper.querySelectorAll('.wrpr-book-card')];
 
-    wrapper.querySelectorAll('.wrpr-read-btn').forEach((btn) => {
-      btn.addEventListener('click', (event) => {
-        event.preventDefault();
-        const html = btn.dataset.html || '';
-        if (!html) return;
-        const rid = btn.dataset.reader || wrapperReaderId || 'default';
-        openHTMLReader(html, rid);
+    wrapper
+      .querySelectorAll(
+        '.wrpr-read-btn, .read-pdf-button, .wrpr-read-button, .btn-read, .button-read'
+      )
+      .forEach((btn) => {
+        btn.addEventListener('click', (event) => {
+          event.preventDefault();
+          const html = btn.dataset.html || '';
+          if (!html) return;
+          const rid = btn.dataset.reader || wrapperReaderId || 'default';
+          openHTMLReader(html, rid);
+        });
       });
-    });
 
     const langSelects = wrapper.querySelectorAll('.wrpr-lang-select');
     if (!langSelects.length || !bookCards.length) return;
