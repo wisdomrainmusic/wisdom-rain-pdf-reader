@@ -367,7 +367,12 @@ function computePageHeight() {
       const cleanHtml = await cleanRemoteHTML(rawHtml);
 
       const parser = new DOMParser();
-      const doc = parser.parseFromString(cleanHtml, 'text/html');
+      let doc = parser.parseFromString(cleanHtml, 'text/html');
+      if (!doc.body) {
+        const safeHtml = `<html><body>${cleanHtml}</body></html>`;
+        doc = parser.parseFromString(safeHtml, 'text/html');
+      }
+
       const body = doc.body || doc.documentElement;
       ORIGINAL_BODY = body.cloneNode(true);
 
