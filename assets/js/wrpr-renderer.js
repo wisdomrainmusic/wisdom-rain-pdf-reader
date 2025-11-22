@@ -8,13 +8,41 @@
 const WRPR_BASE_PAGE_HEIGHT = 680; // A6 içerik yüksekliği (px)
 const WRPR_MODAL_BUFFER = 180; // nav/info yüksekliği için ek alan
 const WRPR_RESIZE_DEBOUNCE = 180;
-const WRPR_MOBILE_BREAKPOINT = 768;
 
 let PAGE_HEIGHT = 0; // runtime'da set edilecek
 let ORIGINAL_BODY = null;
 let CURRENT_PAGE = 0;
 let CURRENT_READER_ID = null;
 let MODAL_OPEN = false;
+
+async function cleanRemoteHTML(html) {
+  if (!html || typeof wrprCleanerData === 'undefined' || !wrprCleanerData.ajaxUrl) {
+    return html || '';
+  }
+
+  try {
+    const params = new URLSearchParams();
+    params.append('action', 'wrpr_clean_html');
+    params.append('nonce', wrprCleanerData.nonce || '');
+    params.append('html', html);
+
+    const response = await fetch(wrprCleanerData.ajaxUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' },
+      body: params,
+    });
+
+    if (!response.ok) return html;
+    const result = await response.json();
+    if (result && result.success && typeof result.data === 'string') {
+      return result.data;
+    }
+  } catch (err) {
+    console.warn('WRPR cleanHTML failed', err);
+  }
+
+  return html;
+}
 
 function computePageHeight() {
   const viewportCap = Math.floor(window.innerHeight * 0.92);
@@ -335,10 +363,11 @@ function computePageHeight() {
     try {
       const response = await fetch(htmlUrl, { cache: 'no-cache' });
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      const html = await response.text();
+      const rawHtml = await response.text();
+      const cleanHtml = await cleanRemoteHTML(rawHtml);
 
       const parser = new DOMParser();
-      const doc = parser.parseFromString(html, 'text/html');
+      const doc = parser.parseFromString(cleanHtml, 'text/html');
       const body = doc.body || doc.documentElement;
       ORIGINAL_BODY = body.cloneNode(true);
 

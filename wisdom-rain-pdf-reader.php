@@ -19,6 +19,7 @@ define( 'WRPR_URL', plugin_dir_url( __FILE__ ) );
 
 require_once WRPR_PATH . 'includes/wrpr-admin.php';
 require_once WRPR_PATH . 'includes/class-wrpr-shortcode.php';
+require_once WRPR_PATH . 'includes/class-wrpr-cleaner.php';
 
 function wrpr_init_plugin() {
     wrpr_load_textdomain();
@@ -46,6 +47,15 @@ function wrpr_enqueue_assets() {
         true
     );
 
+    wp_localize_script(
+        'wrpr-renderer',
+        'wrprCleanerData',
+        array(
+            'ajaxUrl' => admin_url( 'admin-ajax.php' ),
+            'nonce'   => wp_create_nonce( 'wrpr_clean_html' ),
+        )
+    );
+
     wp_enqueue_style(
         'font-awesome',
         'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css',
@@ -62,6 +72,26 @@ function wrpr_enqueue_assets() {
     );
 }
 add_action('wp_enqueue_scripts', 'wrpr_enqueue_assets');
+
+function wrpr_render_viewport_meta() {
+    if ( is_admin() ) {
+        return;
+    }
+
+    echo '<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5, user-scalable=yes" />';
+}
+add_action( 'wp_head', 'wrpr_render_viewport_meta', 1 );
+
+function wrpr_clean_html_ajax() {
+    check_ajax_referer( 'wrpr_clean_html', 'nonce' );
+
+    $raw_html = isset( $_POST['html'] ) ? wp_unslash( $_POST['html'] ) : '';
+    $cleaned  = WRPR_Cleaner::clean_html( $raw_html );
+
+    wp_send_json_success( $cleaned );
+}
+add_action( 'wp_ajax_wrpr_clean_html', 'wrpr_clean_html_ajax' );
+add_action( 'wp_ajax_nopriv_wrpr_clean_html', 'wrpr_clean_html_ajax' );
 
 function wrpr_render_modal_shell() {
     if ( is_admin() ) {
