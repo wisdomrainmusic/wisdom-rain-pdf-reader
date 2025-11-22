@@ -227,15 +227,31 @@
 
 .wr-page {
   background: #e3c37a !important;
+  width: 100%;
+  max-width: 700px;
+  margin: 0 auto;
   height: 720px;
   max-height: 720px;
   overflow: hidden;
   padding: 25px 30px !important;
   box-sizing: border-box;
-  margin: 0 auto !important;
-  max-width: 680px !important;
   border-radius: 18px !important;
   box-shadow: 0 0 80px rgba(0,0,0,0.35);
+}
+
+.wr-page:first-child {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.wr-page:first-child p {
+  text-align: center;
+}
+
+.wr-page p:first-child strong {
+  display: inline-block;
+  margin-top: 24px;
 }
 
 .wr-page h1, .wr-page h2, .wr-page h3 {
