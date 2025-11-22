@@ -90,3 +90,9 @@
 - **Spacing normalization**: Mammoth çıktısında paragraflara standart `margin-bottom` (14px) uygula; bölüm öncesi/sonrası ekstra boşluk eklenmemesi için boş `<p>`’leri kaldırmaya devam et.【F:assets/js/wrpr-renderer.js†L69-L72】【F:assets/css/wrpr-style.css†L271-L279】
 - **Bold normalization**: `strong/b` sadece kelime içi vurgu için; tam paragraf bold geliyorsa dönüştürme sırasında class ekleyip CSS ile normal ağırlığa çekilebilir.【F:assets/css/wrpr-style.css†L275-L279】【F:assets/css/wrpr-style.css†L475-L479】
 - **“A6 clean mode”**: Mammoth sonrası minimal wrapper (sadece p/h tags), inline stil yok, liste marjinleri standart; pagination öncesi gereksiz div/span’lar temizlenip ölçüm doğruluğu artırılmalı.【F:assets/js/wrpr-renderer.js†L37-L118】
+
+## Applied Fixes (Codex)
+- A6 içerik yüksekliği `computePageHeight` ile sabitlenip CSS değişkeni üzerinden `.wr-page` ve modal ölçüleri senkronize edildi.
+- `paginateFixed` tek çocuk ve taşma senaryolarında metni bölerek deterministik sayfa üretimi sağlıyor; başlık-paragraf paketleme ve boş sayfa engelleyiciler eklendi.
+- Reader resize/orientation akışı debounce edildi, mevcut sayfa/restorasyon clamp’lenerek localStorage ilerlemesi korunuyor.
+- CSS tarafında `.wr-page` kutusu için sabit padding/aspect-ratio, box-shadow için ayrı `wr-page-shell`, normalize heading/paragraf boşlukları ve scrollbar engeli uygulandı.

@@ -5,13 +5,21 @@
  * - Page navigation with localStorage progress resume is preserved.
  */
 // --- WRPR A6 PAGE CONSTANTS ---
+const WRPR_BASE_PAGE_HEIGHT = 680; // A6 içerik yüksekliği (px)
+const WRPR_MODAL_BUFFER = 180; // nav/info yüksekliği için ek alan
+const WRPR_RESIZE_DEBOUNCE = 180;
+const WRPR_MOBILE_BREAKPOINT = 768;
+
 let PAGE_HEIGHT = 0; // runtime'da set edilecek
-const WRPR_PAGE_HEIGHT_DESKTOP = 720; // A6 sabit yükseklik (px)
-const WRPR_PAGE_HEIGHT_MOBILE_RATIO = 0.82; // ekranın %82'si (vh bazlı)
 let ORIGINAL_BODY = null;
 let CURRENT_PAGE = 0;
 let CURRENT_READER_ID = null;
 let MODAL_OPEN = false;
+
+function computePageHeight() {
+  const viewportCap = Math.floor(window.innerHeight * 0.92);
+  return Math.max(400, Math.min(WRPR_BASE_PAGE_HEIGHT, viewportCap));
+}
 (function () {
   const modal = document.getElementById('wrpr-modal');
   if (!modal) return;
@@ -28,15 +36,84 @@ let MODAL_OPEN = false;
   let readerId = '';
   let htmlUrl = '';
   let storageKey = '';
-  let isMobile = window.innerWidth <= 600;
+  let resizeTimer = null;
 
   function setPageInfo(text) {
     if (pageInfoEl) pageInfoEl.textContent = text;
   }
 
+  function createCloneWithText(node, text) {
+    const shallow = node.cloneNode(false);
+    shallow.textContent = text;
+    shallow.style.breakInside = 'avoid';
+    shallow.style.pageBreakInside = 'avoid';
+    shallow.style.webkitColumnBreakInside = 'avoid';
+    return shallow;
+  }
+
+  function splitTextNodeToFit(node, page, maxHeight) {
+    const originalText = (node.textContent || '').trim();
+    if (!originalText) return null;
+
+    const attemptSplit = (parts) => {
+      let low = 1;
+      let high = parts.length;
+      let best = 0;
+
+      while (low <= high) {
+        const mid = Math.floor((low + high) / 2);
+        const firstText = parts.slice(0, mid).join(' ');
+        const clone = createCloneWithText(node, firstText);
+        page.appendChild(clone);
+        const fits = page.scrollHeight <= maxHeight;
+        page.removeChild(clone);
+
+        if (fits) {
+          best = mid;
+          low = mid + 1;
+        } else {
+          high = mid - 1;
+        }
+      }
+
+      if (!best) return null;
+
+      const first = createCloneWithText(node, parts.slice(0, best).join(' '));
+      const remainder = parts.slice(best).join(' ');
+      const second = remainder ? createCloneWithText(node, remainder) : null;
+      return { first, second };
+    };
+
+    const words = originalText.split(/\s+/).filter(Boolean);
+    let result = attemptSplit(words);
+
+    if (!result && words.length === 1) {
+      const chars = originalText.split('');
+      result = attemptSplit(chars);
+    }
+
+    return result;
+  }
+
+  function cleanWrapperNodes(root) {
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT, null);
+    const toRemove = [];
+    while (walker.nextNode()) {
+      const node = walker.currentNode;
+      if (node.tagName === 'SPAN' && !node.attributes.length && !node.textContent.trim()) {
+        toRemove.push(node);
+      }
+      if (node.tagName === 'DIV' && !node.attributes.length && !node.textContent.trim()) {
+        toRemove.push(node);
+      }
+    }
+    toRemove.forEach((n) => n.parentNode && n.parentNode.removeChild(n));
+  }
+
   function paginateFixed(bodyElement) {
     const pages = [];
     const source = bodyElement.cloneNode(true);
+    cleanWrapperNodes(source);
 
     const measurementContainer = document.createElement('div');
     measurementContainer.style.position = 'absolute';
@@ -54,45 +131,73 @@ let MODAL_OPEN = false;
     const createPage = () => {
       const page = document.createElement('div');
       page.className = 'wr-page';
+      page.style.height = `${PAGE_HEIGHT}px`;
       measurementContainer.appendChild(page);
       return page;
     };
 
     let workingPage = createPage();
+    const nodes = Array.from(source.childNodes);
 
-    for (let node of Array.from(source.childNodes)) {
-      // Skip empty text nodes
-      if (node.nodeType === 3 && !node.textContent.trim()) {
-        continue;
+    for (let i = 0; i < nodes.length; i++) {
+      const node = nodes[i];
+
+      if (node.nodeType === 3 && !node.textContent.trim()) continue;
+      if (node.tagName === 'P' && node.textContent.trim().length === 0) continue;
+
+      const isHeading = ['H1', 'H2', 'H3'].includes(node.tagName);
+      const nextNode = nodes[i + 1];
+
+      const prepareClone = (n) => {
+        const c = n.cloneNode(true);
+        if (c.nodeType === Node.ELEMENT_NODE) {
+          c.style.breakInside = 'avoid';
+          c.style.pageBreakInside = 'avoid';
+          c.style.webkitColumnBreakInside = 'avoid';
+        }
+        return c;
+      };
+
+      if (isHeading && workingPage.childNodes.length === 0 && nextNode) {
+        const headingClone = prepareClone(node);
+        workingPage.appendChild(headingClone);
+        const headingHeight = workingPage.scrollHeight;
+        if (headingHeight <= PAGE_HEIGHT * 0.4) {
+          const nextClone = prepareClone(nextNode);
+          workingPage.appendChild(nextClone);
+          if (workingPage.scrollHeight > PAGE_HEIGHT) {
+            workingPage.removeChild(nextClone);
+          } else {
+            i += 1;
+            continue;
+          }
+        }
+        workingPage.removeChild(headingClone);
       }
 
-      // Skip empty paragraphs
-      if (node.tagName === 'P' && node.textContent.trim().length === 0) {
-        continue;
-      }
-
-      // Kısa paragraf başlıkları tek başına sayfa yapmasın
-      if (
-        node.tagName === "P" &&
-        node.textContent.trim().length < 25 &&
-        workingPage.childNodes.length === 0
-      ) {
-        // Sadece başlık gibi davran, ama sayfayı kapatma
-        const clone = node.cloneNode(true);
-        workingPage.appendChild(clone);
-        continue;
-      }
-
-      const clone = node.cloneNode(true);
-      if (clone.nodeType === Node.ELEMENT_NODE) {
-        clone.style.breakInside = 'avoid';
-        clone.style.pageBreakInside = 'avoid';
-        clone.style.webkitColumnBreakInside = 'avoid';
-      }
+      const clone = prepareClone(node);
       workingPage.appendChild(clone);
 
       if (workingPage.scrollHeight > PAGE_HEIGHT) {
         workingPage.removeChild(clone);
+
+        if (clone.tagName === 'P' || ['H1', 'H2', 'H3'].includes(clone.tagName)) {
+          const splitResult = splitTextNodeToFit(clone, workingPage, PAGE_HEIGHT);
+          if (splitResult) {
+            workingPage.appendChild(splitResult.first);
+            if (workingPage.scrollHeight <= PAGE_HEIGHT) {
+              pages.push(workingPage.outerHTML);
+              workingPage = createPage();
+            } else {
+              workingPage.removeChild(splitResult.first);
+            }
+
+            if (splitResult.second) {
+              nodes.splice(i + 1, 0, splitResult.second);
+            }
+            continue;
+          }
+        }
 
         if (workingPage.childNodes.length) {
           pages.push(workingPage.outerHTML);
@@ -101,7 +206,7 @@ let MODAL_OPEN = false;
 
         workingPage.appendChild(clone);
 
-        if (workingPage.scrollHeight > PAGE_HEIGHT || workingPage.childNodes.length === 1) {
+        if (workingPage.scrollHeight > PAGE_HEIGHT) {
           pages.push(workingPage.outerHTML);
           workingPage = createPage();
         }
@@ -121,6 +226,11 @@ let MODAL_OPEN = false;
     const hasPages = WR_PAGES.length > 0;
     if (btnPrev) btnPrev.disabled = !hasPages || currentPage <= 0;
     if (btnNext) btnNext.disabled = !hasPages || currentPage >= WR_PAGES.length - 1;
+  }
+
+  function applyPageHeight() {
+    PAGE_HEIGHT = computePageHeight();
+    document.documentElement.style.setProperty('--wrpr-page-height', `${PAGE_HEIGHT}px`);
   }
 
   function showModal() {
@@ -188,7 +298,12 @@ let MODAL_OPEN = false;
     }
 
     readerContent.innerHTML = '';
-    if (pageEl) readerContent.appendChild(pageEl);
+    if (pageEl) {
+      const shell = document.createElement('div');
+      shell.className = 'wr-page-shell';
+      shell.appendChild(pageEl);
+      readerContent.appendChild(shell);
+    }
 
     currentPage = index;
     CURRENT_PAGE = index;
@@ -213,8 +328,6 @@ let MODAL_OPEN = false;
 
     if (!htmlUrl) return;
 
-    isMobile = window.innerWidth <= 600;
-
     showModal();
     setPageInfo('Loading...');
     updateNavState();
@@ -228,16 +341,15 @@ let MODAL_OPEN = false;
       const doc = parser.parseFromString(html, 'text/html');
       const body = doc.body || doc.documentElement;
       ORIGINAL_BODY = body.cloneNode(true);
-      const isMobile = window.innerWidth < 768;
 
-      if (isMobile) {
-        PAGE_HEIGHT = Math.floor(window.innerHeight * WRPR_PAGE_HEIGHT_MOBILE_RATIO);
-      } else {
-        PAGE_HEIGHT = WRPR_PAGE_HEIGHT_DESKTOP;
-      }
+      applyPageHeight();
+      syncReaderHeight();
 
       WR_PAGES = paginateFixed(ORIGINAL_BODY);
-      const startIndex = Math.min(restoreProgress(), Math.max(WR_PAGES.length - 1, 0));
+      const restoredIndex = restoreProgress();
+      const maxIndex = Math.max(WR_PAGES.length - 1, 0);
+      const startIndex = Math.min(restoredIndex, maxIndex);
+      CURRENT_PAGE = startIndex;
       renderPage(startIndex);
     } catch (err) {
       console.error('WRPR load error', err);
@@ -251,12 +363,11 @@ let MODAL_OPEN = false;
 
   function syncReaderHeight() {
     if (!readerContent || !modalContent) return;
-    const maxHeight = Math.max(200, Math.floor(window.innerHeight * 0.85));
-    readerContent.style.maxHeight = `${maxHeight}px`;
-  }
-
-  function repaginateOnResize() {
-    isMobile = window.innerWidth <= 600;
+    const modalMax = Math.min(
+      Math.floor(window.innerHeight * 0.95),
+      PAGE_HEIGHT + WRPR_MODAL_BUFFER
+    );
+    readerContent.style.maxHeight = `${modalMax}px`;
   }
 
   if (btnPrev) {
@@ -313,30 +424,37 @@ let MODAL_OPEN = false;
 
   document.querySelectorAll('.wrpr-reader-wrapper').forEach((wrapper) => bindReader(wrapper));
 
+  applyPageHeight();
   syncReaderHeight();
+
   window.addEventListener('resize', () => {
-    const isMobile = window.innerWidth < 768;
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(() => {
+      applyPageHeight();
+      syncReaderHeight();
 
-    if (isMobile) {
-      PAGE_HEIGHT = Math.floor(window.innerHeight * WRPR_PAGE_HEIGHT_MOBILE_RATIO);
-    } else {
-      PAGE_HEIGHT = WRPR_PAGE_HEIGHT_DESKTOP;
-    }
+      if (!MODAL_OPEN || !ORIGINAL_BODY) return;
 
-    if (!MODAL_OPEN) return;
+      const savedPage = CURRENT_PAGE || 0;
+      const pages = paginateFixed(ORIGINAL_BODY);
+      WR_PAGES = pages;
 
-    const savedPage = CURRENT_PAGE || 0;
-
-    WR_PAGES = paginateFixed(ORIGINAL_BODY);
-    CURRENT_PAGE = Math.min(CURRENT_PAGE, WR_PAGES.length - 1);
-
-    const maxPage = WR_PAGES.length - 1;
-    const nextPage = Math.min(savedPage, maxPage);
-
-    renderPage(nextPage);
+      const maxIndex = Math.max(WR_PAGES.length - 1, 0);
+      const targetIndex = Math.min(Math.max(savedPage, 0), maxIndex);
+      CURRENT_PAGE = targetIndex;
+      renderPage(targetIndex);
+    }, WRPR_RESIZE_DEBOUNCE);
   });
+
   window.addEventListener('orientationchange', () => {
+    applyPageHeight();
     syncReaderHeight();
-    repaginateOnResize();
+    if (!MODAL_OPEN || !ORIGINAL_BODY) return;
+    const pages = paginateFixed(ORIGINAL_BODY);
+    WR_PAGES = pages;
+    const maxIndex = Math.max(WR_PAGES.length - 1, 0);
+    const targetIndex = Math.min(Math.max(CURRENT_PAGE, 0), maxIndex);
+    CURRENT_PAGE = targetIndex;
+    renderPage(targetIndex);
   });
 })();
