@@ -61,15 +61,13 @@ let MODAL_OPEN = false;
     let workingPage = createPage();
 
     for (let node of Array.from(source.childNodes)) {
-      // Skip empty nodes safely
-      if (
-        node.nodeType === 3 && !node.textContent.trim()
-      ) {
+      // Skip empty text nodes
+      if (node.nodeType === 3 && !node.textContent.trim()) {
         continue;
       }
-      if (
-        node.tagName === "P" && node.textContent.trim().length === 0
-      ) {
+
+      // Skip empty paragraphs
+      if (node.tagName === 'P' && node.textContent.trim().length === 0) {
         continue;
       }
 
@@ -78,16 +76,6 @@ let MODAL_OPEN = false;
         clone.style.breakInside = 'avoid';
         clone.style.pageBreakInside = 'avoid';
         clone.style.webkitColumnBreakInside = 'avoid';
-      }
-
-      // Detect short bold headings
-      if (
-        clone.tagName === 'P' &&
-        clone.innerText.trim().length < 25 &&
-        clone.querySelector('strong')
-      ) {
-        clone.style.textAlign = 'center';
-        clone.style.marginTop = '30px';
       }
       workingPage.appendChild(clone);
 
@@ -167,14 +155,6 @@ let MODAL_OPEN = false;
   }
 
   function renderPage(index) {
-    const applyCoverCentering = (pageElement) => {
-      if (index === 0 && pageElement) {
-        pageElement.style.display = 'flex';
-        pageElement.style.flexDirection = 'column';
-        pageElement.style.justifyContent = 'center';
-      }
-    };
-
     if (!readerContent) return;
     if (!WR_PAGES.length) {
       readerContent.innerHTML = '<div class="wr-page"><p>No content available.</p></div>';
@@ -191,7 +171,6 @@ let MODAL_OPEN = false;
     const pageEl = wrapper.firstElementChild;
 
     if (pageEl) {
-      applyCoverCentering(pageEl);
       pageEl.setAttribute('data-page', index + 1);
       if (!pageEl.classList.contains('wr-page')) pageEl.classList.add('wr-page');
     }
