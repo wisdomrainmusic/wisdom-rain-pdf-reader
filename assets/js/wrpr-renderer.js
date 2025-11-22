@@ -15,6 +15,22 @@ let CURRENT_PAGE = 0;
 let CURRENT_READER_ID = null;
 let MODAL_OPEN = false;
 
+(function normalizeViewport() {
+  try {
+    const metas = document.querySelectorAll('meta[name="viewport"]');
+    if (!metas.length) return;
+
+    metas.forEach((meta) => {
+      meta.setAttribute(
+        'content',
+        'width=device-width, initial-scale=1.0, maximum-scale=5, user-scalable=yes'
+      );
+    });
+  } catch (e) {
+    console.error('WRPR viewport normalize error', e);
+  }
+})();
+
 async function cleanRemoteHTML(html) {
   if (!html || typeof wrprCleanerData === 'undefined' || !wrprCleanerData.ajaxUrl) {
     return html || '';
@@ -264,7 +280,7 @@ function computePageHeight() {
   function showModal() {
     modal.style.display = 'flex';
     modal.setAttribute('aria-hidden', 'false');
-    document.documentElement.style.overflow = 'hidden';
+    document.body.classList.add('wrpr-modal-open');
     MODAL_OPEN = true;
   }
 
@@ -280,7 +296,7 @@ function computePageHeight() {
   function hideModal() {
     modal.style.display = 'none';
     modal.setAttribute('aria-hidden', 'true');
-    document.documentElement.style.overflow = '';
+    document.body.classList.remove('wrpr-modal-open');
     MODAL_OPEN = false;
     clearReader();
     setPageInfo('Page 1 / 1');
