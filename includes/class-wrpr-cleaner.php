@@ -13,16 +13,23 @@ class WRPR_Cleaner {
      * @return string Sanitized HTML ready for pagination.
      */
     public static function clean_html( $html ) {
-        if ( ! is_string( $html ) || '' === trim( $html ) ) {
-            return '';
+        $raw_html = (string) $html;
+
+        if ( '' === trim( $raw_html ) ) {
+            return $raw_html;
         }
 
-        $html = str_replace( ['<b', '</b>'], ['<strong', '</strong>'], $html );
+        $sanitizable_html = $raw_html;
+        if ( false === stripos( $sanitizable_html, '<html' ) || false === stripos( $sanitizable_html, '<body' ) ) {
+            $sanitizable_html = '<html><body>' . $sanitizable_html . '</body></html>';
+        }
+
+        $sanitizable_html = str_replace( ['<b', '</b>'], ['<strong', '</strong>'], $sanitizable_html );
 
         $flags = LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD;
         $dom   = new DOMDocument();
         libxml_use_internal_errors( true );
-        $dom->loadHTML( '<?xml encoding="utf-8" ?>' . $html, $flags );
+        $dom->loadHTML( '<?xml encoding="utf-8" ?>' . $sanitizable_html, $flags );
         libxml_clear_errors();
 
         $xpath = new DOMXPath( $dom );
@@ -41,7 +48,7 @@ class WRPR_Cleaner {
 
         $body = $dom->getElementsByTagName( 'body' )->item( 0 );
         if ( ! $body ) {
-            return '';
+            return $raw_html;
         }
 
         $clean = '';
@@ -49,7 +56,13 @@ class WRPR_Cleaner {
             $clean .= $dom->saveHTML( $child );
         }
 
-        return trim( $clean );
+        $clean = trim( $clean );
+
+        if ( '' === $clean ) {
+            return $raw_html;
+        }
+
+        return $clean;
     }
 
     private static function unwrap_spans( DOMXPath $xpath ) {
