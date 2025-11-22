@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>WRPR A6 Clean Output</title>
+</head>
+<body>
+  <h1>Wisdom Rain A6 Clean Mode</h1>
+  <p>This document demonstrates the sanitized HTML structure used by the WRPR reader after Mammoth output is cleaned.</p>
+
+  <h3>Inline Emphasis</h3>
+  <p>Inline <strong>bold</strong> highlights remain, but full-paragraph bold wrappers are removed.</p>
+  <p><strong>Single emphasis</strong> paragraphs render with lighter weight to avoid overpowering the layout.</p>
+
+  <h3>Unordered List</h3>
+  <ul>
+    <li><strong>Lead</strong> item text continues normally after the initial strong keyword.</li>
+    <li>Regular list entries keep spacing without stray styles.</li>
+    <li>Nested emphasis <strong>stays inline</strong> without wrapping the whole row.</li>
+  </ul>
+
+  <h3>Ordered List</h3>
+  <ol>
+    <li>Numeric steps keep their structure while bold wrappers are normalized.</li>
+    <li>Attributes such as width, height, class, and inline styles are stripped.</li>
+    <li>Empty paragraphs and break tags are removed to prevent pagination gaps.</li>
+  </ol>
+
+  <h4>Compact Paragraphs</h4>
+  <p>Paragraphs keep a consistent bottom margin of 14px to align with the A6 layout grid.</p>
+  <p>Heading spacing is tuned for readability within the fixed-height reader viewport.</p>
+</body>
+</html>
