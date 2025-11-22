@@ -61,6 +61,14 @@ let MODAL_OPEN = false;
     let workingPage = createPage();
 
     Array.from(source.childNodes).forEach((node) => {
+      // Skip empty text nodes and empty paragraphs
+      if (
+        !node.textContent.trim() ||
+        (node.tagName === 'P' && node.textContent.trim().length === 0)
+      ) {
+        continue;
+      }
+
       if (node.nodeType === Node.TEXT_NODE && !node.textContent.trim()) return;
 
       const clone = node.cloneNode(true);
@@ -68,6 +76,16 @@ let MODAL_OPEN = false;
         clone.style.breakInside = 'avoid';
         clone.style.pageBreakInside = 'avoid';
         clone.style.webkitColumnBreakInside = 'avoid';
+      }
+
+      // Detect short bold headings
+      if (
+        clone.tagName === 'P' &&
+        clone.innerText.trim().length < 25 &&
+        clone.querySelector('strong')
+      ) {
+        clone.style.textAlign = 'center';
+        clone.style.marginTop = '30px';
       }
       workingPage.appendChild(clone);
 
@@ -147,6 +165,14 @@ let MODAL_OPEN = false;
   }
 
   function renderPage(index) {
+    const applyCoverCentering = (pageElement) => {
+      if (index === 0 && pageElement) {
+        pageElement.style.display = 'flex';
+        pageElement.style.flexDirection = 'column';
+        pageElement.style.justifyContent = 'center';
+      }
+    };
+
     if (!readerContent) return;
     if (!WR_PAGES.length) {
       readerContent.innerHTML = '<div class="wr-page"><p>No content available.</p></div>';
@@ -163,6 +189,7 @@ let MODAL_OPEN = false;
     const pageEl = wrapper.firstElementChild;
 
     if (pageEl) {
+      applyCoverCentering(pageEl);
       pageEl.setAttribute('data-page', index + 1);
       if (!pageEl.classList.contains('wr-page')) pageEl.classList.add('wr-page');
     }
@@ -308,6 +335,7 @@ let MODAL_OPEN = false;
     const savedPage = CURRENT_PAGE || 0;
 
     WR_PAGES = paginateFixed(ORIGINAL_BODY);
+    CURRENT_PAGE = Math.min(CURRENT_PAGE, WR_PAGES.length - 1);
 
     const maxPage = WR_PAGES.length - 1;
     const nextPage = Math.min(savedPage, maxPage);
