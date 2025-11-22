@@ -14,6 +14,8 @@ let ORIGINAL_BODY = null;
 let CURRENT_PAGE = 0;
 let CURRENT_READER_ID = null;
 let MODAL_OPEN = false;
+let wrprCurrentLang = '';
+let wrprLangSelect = null;
 
 (function normalizeViewport() {
   try {
@@ -74,7 +76,43 @@ function computePageHeight() {
   const btnNext = modal.querySelector('#wrpr-next-page, #wrpr-next');
   const btnClose = modal.querySelector('#wrpr-close');
   const pageInfoEl = modal.querySelector('.wrpr-page-info');
-  const translateSelect = modal.querySelector('#wrpr-lang-select');
+  wrprLangSelect = document.getElementById('wrpr-lang-select');
+  const translateSelect = wrprLangSelect || modal.querySelector('#wrpr-lang-select');
+  if (!translateSelect) {
+    wrprLangSelect = null;
+  } else {
+    wrprLangSelect = translateSelect;
+
+    const saved = window.localStorage.getItem('wrpr_lang') || '';
+    if (saved) {
+      wrprCurrentLang = saved;
+      wrprLangSelect.value = wrprCurrentLang;
+      setTimeout(() => wrprApplyGoogleLanguage(wrprCurrentLang), 300);
+    }
+
+    wrprLangSelect.addEventListener('change', function (e) {
+      wrprCurrentLang = e.target.value || '';
+      window.localStorage.setItem('wrpr_lang', wrprCurrentLang);
+
+      if (wrprCurrentLang) {
+        wrprApplyGoogleLanguage(wrprCurrentLang);
+      } else {
+        const combo = document.querySelector('.goog-te-combo');
+        if (combo) {
+          combo.value = '';
+          combo.dispatchEvent(new Event('change'));
+        }
+      }
+    });
+  }
+
+  function wrprApplyGoogleLanguage(lang) {
+    const combo = document.querySelector('.goog-te-combo');
+    if (!combo) return;
+
+    combo.value = lang;
+    combo.dispatchEvent(new Event('change'));
+  }
 
   let WR_PAGES = [];
   let currentPage = 0;
@@ -288,25 +326,11 @@ function computePageHeight() {
     }
   }
 
-  function applySavedLanguageSelection() {
-    if (!translateSelect) return;
-    let savedLang = '';
-    try {
-      savedLang = localStorage.getItem('wrpr_lang') || '';
-    } catch (err) {
-      console.warn('WRPR: unable to read saved language', err);
-    }
-
-    translateSelect.value = savedLang;
-    translateSelect.dispatchEvent(new Event('change'));
-  }
-
   function showModal() {
     modal.style.display = 'flex';
     modal.setAttribute('aria-hidden', 'false');
     document.body.classList.add('wrpr-modal-open');
     MODAL_OPEN = true;
-    applySavedLanguageSelection();
   }
 
   function clearReader() {
@@ -380,6 +404,14 @@ function computePageHeight() {
     saveProgress();
     updateNavState();
     wrprTriggerTranslateRefresh();
+    if (wrprLangSelect && wrprCurrentLang && wrprLangSelect.value !== wrprCurrentLang) {
+      wrprLangSelect.value = wrprCurrentLang;
+    }
+    // Sayfa değişince seçili çeviri dili tekrar uygula
+    if (wrprCurrentLang) {
+      // Google combo ve DOM'un hazır olması için küçük bir gecikme
+      setTimeout(() => wrprApplyGoogleLanguage(wrprCurrentLang), 100);
+    }
   }
 
   async function openHTMLReader(url, rid) {
@@ -460,23 +492,6 @@ function computePageHeight() {
 
   if (btnClose) {
     btnClose.addEventListener('click', hideModal);
-  }
-
-  if (translateSelect) {
-    translateSelect.addEventListener('change', (e) => {
-      const lang = e.target.value;
-      try {
-        localStorage.setItem('wrpr_lang', lang);
-      } catch (err) {
-        console.warn('WRPR: unable to persist language', err);
-      }
-
-      const googleCombo = document.querySelector('.goog-te-combo');
-      if (googleCombo) {
-        googleCombo.value = lang;
-        googleCombo.dispatchEvent(new Event('change'));
-      }
-    });
   }
 
   document.addEventListener('keydown', (e) => {
