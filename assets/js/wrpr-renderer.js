@@ -60,16 +60,18 @@ let MODAL_OPEN = false;
 
     let workingPage = createPage();
 
-    Array.from(source.childNodes).forEach((node) => {
-      // Skip empty text nodes and empty paragraphs
+    for (let node of Array.from(source.childNodes)) {
+      // Skip empty nodes safely
       if (
-        !node.textContent.trim() ||
-        (node.tagName === 'P' && node.textContent.trim().length === 0)
+        node.nodeType === 3 && !node.textContent.trim()
       ) {
         continue;
       }
-
-      if (node.nodeType === Node.TEXT_NODE && !node.textContent.trim()) return;
+      if (
+        node.tagName === "P" && node.textContent.trim().length === 0
+      ) {
+        continue;
+      }
 
       const clone = node.cloneNode(true);
       if (clone.nodeType === Node.ELEMENT_NODE) {
@@ -104,7 +106,7 @@ let MODAL_OPEN = false;
           workingPage = createPage();
         }
       }
-    });
+    }
 
     if (workingPage.childNodes.length) {
       pages.push(workingPage.outerHTML);
