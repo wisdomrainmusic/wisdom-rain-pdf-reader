@@ -102,6 +102,25 @@ function wrpr_render_modal_shell() {
     <div id="wrpr-modal" aria-hidden="true" role="dialog" aria-modal="true" aria-label="<?php echo esc_attr__( 'PDF reader', 'wrpr' ); ?>">
         <div id="wrpr-modal-content">
             <button type="button" id="wrpr-close" aria-label="<?php echo esc_attr__( 'Close reader', 'wrpr' ); ?>">&times;</button>
+            <div id="wrpr-translate-bar">
+               <select id="wrpr-lang-select">
+                  <option value="">All Languages</option>
+                  <option value="de">German</option>
+                  <option value="fr">French</option>
+                  <option value="it">Italian</option>
+                  <option value="pt">Portuguese</option>
+                  <option value="tr">Turkish</option>
+                  <option value="ru">Russian</option>
+                  <option value="es">Spanish</option>
+                  <option value="hi">Hindi</option>
+                  <option value="ja">Japanese</option>
+                  <option value="zh-CN">Chinese (Simplified)</option>
+                  <option value="no">Norwegian</option>
+                  <option value="ar">Arabic</option>
+                  <option value="nl">Dutch</option>
+                  <option value="pl">Polish</option>
+               </select>
+            </div>
             <div id="wrpr-reader-content" class="wrpr-reader-content"></div>
             <div class="wrpr-page-info"><?php echo esc_html__( 'Page 1', 'wrpr' ); ?></div>
             <div class="wrpr-nav">
@@ -114,6 +133,20 @@ function wrpr_render_modal_shell() {
             </div>
         </div>
     </div>
+    <div id="google_translate_element" style="display:none;"></div>
+    <script type="text/javascript">
+    function googleTranslateElementInit() {
+      new google.translate.TranslateElement(
+        {
+          pageLanguage: 'en',
+          includedLanguages: 'de,fr,it,pt,tr,ru,es,hi,ja,zh-CN,no,ar,nl,pl',
+          autoDisplay: false
+        },
+        'google_translate_element'
+      );
+    }
+    </script>
+    <script src="//translate.google.com/translate_a/element.js?cb=googleTranslateElementInit"></script>
     <?php
 }
 add_action( 'wp_footer', 'wrpr_render_modal_shell' );

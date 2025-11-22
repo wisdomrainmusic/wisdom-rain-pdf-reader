@@ -74,6 +74,7 @@ function computePageHeight() {
   const btnNext = modal.querySelector('#wrpr-next-page, #wrpr-next');
   const btnClose = modal.querySelector('#wrpr-close');
   const pageInfoEl = modal.querySelector('.wrpr-page-info');
+  const translateSelect = modal.querySelector('#wrpr-lang-select');
 
   let WR_PAGES = [];
   let currentPage = 0;
@@ -277,11 +278,35 @@ function computePageHeight() {
     document.documentElement.style.setProperty('--wrpr-page-height', `${PAGE_HEIGHT}px`);
   }
 
+  function wrprTriggerTranslateRefresh() {
+    try {
+      const evt = document.createEvent('HTMLEvents');
+      evt.initEvent('DOMNodeInserted', true, true);
+      document.body.dispatchEvent(evt);
+    } catch (e) {
+      console.error('WRPR translate refresh error', e);
+    }
+  }
+
+  function applySavedLanguageSelection() {
+    if (!translateSelect) return;
+    let savedLang = '';
+    try {
+      savedLang = localStorage.getItem('wrpr_lang') || '';
+    } catch (err) {
+      console.warn('WRPR: unable to read saved language', err);
+    }
+
+    translateSelect.value = savedLang;
+    translateSelect.dispatchEvent(new Event('change'));
+  }
+
   function showModal() {
     modal.style.display = 'flex';
     modal.setAttribute('aria-hidden', 'false');
     document.body.classList.add('wrpr-modal-open');
     MODAL_OPEN = true;
+    applySavedLanguageSelection();
   }
 
   function clearReader() {
@@ -354,6 +379,7 @@ function computePageHeight() {
     setPageInfo(`Page ${index + 1} / ${WR_PAGES.length}`);
     saveProgress();
     updateNavState();
+    wrprTriggerTranslateRefresh();
   }
 
   async function openHTMLReader(url, rid) {
@@ -434,6 +460,23 @@ function computePageHeight() {
 
   if (btnClose) {
     btnClose.addEventListener('click', hideModal);
+  }
+
+  if (translateSelect) {
+    translateSelect.addEventListener('change', (e) => {
+      const lang = e.target.value;
+      try {
+        localStorage.setItem('wrpr_lang', lang);
+      } catch (err) {
+        console.warn('WRPR: unable to persist language', err);
+      }
+
+      const googleCombo = document.querySelector('.goog-te-combo');
+      if (googleCombo) {
+        googleCombo.value = lang;
+        googleCombo.dispatchEvent(new Event('change'));
+      }
+    });
   }
 
   document.addEventListener('keydown', (e) => {
