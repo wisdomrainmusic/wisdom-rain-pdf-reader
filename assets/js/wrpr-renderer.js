@@ -87,21 +87,32 @@ function computePageHeight() {
     if (saved) {
       wrprCurrentLang = saved;
       wrprLangSelect.value = wrprCurrentLang;
-      setTimeout(() => wrprApplyGoogleLanguage(wrprCurrentLang), 300);
+      setTimeout(() => {
+        const combo = document.querySelector('.goog-te-combo');
+        if (!combo) return;
+        if (wrprCurrentLang === 'en') {
+          combo.value = '';
+          combo.dispatchEvent(new Event('change'));
+        } else {
+          combo.value = wrprCurrentLang;
+          combo.dispatchEvent(new Event('change'));
+        }
+      }, 300);
     }
 
     wrprLangSelect.addEventListener('change', function (e) {
       wrprCurrentLang = e.target.value || '';
       window.localStorage.setItem('wrpr_lang', wrprCurrentLang);
 
-      if (wrprCurrentLang) {
-        wrprApplyGoogleLanguage(wrprCurrentLang);
-      } else {
-        const combo = document.querySelector('.goog-te-combo');
-        if (combo) {
-          combo.value = '';
-          combo.dispatchEvent(new Event('change'));
-        }
+      const combo = document.querySelector('.goog-te-combo');
+      if (!combo) return;
+
+      if (wrprCurrentLang === 'en') {
+        combo.value = '';
+        combo.dispatchEvent(new Event('change'));
+      } else if (wrprCurrentLang) {
+        combo.value = wrprCurrentLang;
+        combo.dispatchEvent(new Event('change'));
       }
     });
   }
@@ -407,10 +418,13 @@ function computePageHeight() {
     if (wrprLangSelect && wrprCurrentLang && wrprLangSelect.value !== wrprCurrentLang) {
       wrprLangSelect.value = wrprCurrentLang;
     }
-    // Sayfa değişince seçili çeviri dili tekrar uygula
-    if (wrprCurrentLang) {
-      // Google combo ve DOM'un hazır olması için küçük bir gecikme
-      setTimeout(() => wrprApplyGoogleLanguage(wrprCurrentLang), 100);
+    if (wrprCurrentLang && wrprCurrentLang !== 'en') {
+      setTimeout(() => {
+        const combo = document.querySelector('.goog-te-combo');
+        if (!combo) return;
+        combo.value = wrprCurrentLang;
+        combo.dispatchEvent(new Event('change'));
+      }, 100);
     }
   }
 

@@ -104,7 +104,7 @@ function wrpr_render_modal_shell() {
             <button type="button" id="wrpr-close" aria-label="<?php echo esc_attr__( 'Close reader', 'wrpr' ); ?>">&times;</button>
             <div id="wrpr-translate-bar">
                <select id="wrpr-lang-select">
-                  <option value="">All Languages</option>
+                  <option value="en">English (Original)</option>
                   <option value="de">German</option>
                   <option value="fr">French</option>
                   <option value="it">Italian</option>

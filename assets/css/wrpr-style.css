@@ -522,3 +522,24 @@ body.wrpr-modal-open {
     color: #f5d48b;
     font-size: 14px;
 }
+
+/* Google translate toolbar hide */
+.goog-te-banner-frame {
+    display: none !important;
+}
+
+iframe.goog-te-banner-frame {
+    display: none !important;
+}
+
+.goog-te-menu-frame.skiptranslate {
+    display: none !important;
+}
+
+.skiptranslate {
+    display: none !important;
+}
+
+body {
+    top: 0px !important;
+}
