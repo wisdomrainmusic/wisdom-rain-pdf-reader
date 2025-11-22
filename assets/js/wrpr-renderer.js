@@ -71,6 +71,18 @@ let MODAL_OPEN = false;
         continue;
       }
 
+      // Kısa paragraf başlıkları tek başına sayfa yapmasın
+      if (
+        node.tagName === "P" &&
+        node.textContent.trim().length < 25 &&
+        workingPage.childNodes.length === 0
+      ) {
+        // Sadece başlık gibi davran, ama sayfayı kapatma
+        const clone = node.cloneNode(true);
+        workingPage.appendChild(clone);
+        continue;
+      }
+
       const clone = node.cloneNode(true);
       if (clone.nodeType === Node.ELEMENT_NODE) {
         clone.style.breakInside = 'avoid';
