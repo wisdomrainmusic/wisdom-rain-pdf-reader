@@ -159,6 +159,7 @@
   border: 1px solid rgba(255, 215, 150, 0.2);
   box-shadow: 0 0 45px rgba(255, 215, 128, 0.15);
   z-index: 9999;
+  overflow: hidden;
 }
 
 #wrpr-modal-content {
@@ -226,7 +227,11 @@
 
 .wr-page {
   background: #e3c37a !important;
-  padding: 45px 55px !important;
+  height: 720px;
+  max-height: 720px;
+  overflow: hidden;
+  padding: 25px 30px !important;
+  box-sizing: border-box;
   margin: 0 auto !important;
   max-width: 680px !important;
   border-radius: 18px !important;
@@ -237,7 +242,9 @@
     font-family: "Cinzel", serif;
     text-transform: uppercase;
     letter-spacing: 1px;
-    margin-bottom: 22px;
+    margin-top: 0;
+    margin-bottom: 15px;
+    line-height: 1.2;
     color: #d9c075 !important;
 }
 
@@ -254,9 +261,9 @@
 
 .wr-page p {
   font-size: 18px !important;
-  line-height: 1.6 !important;
+  margin: 0 0 14px !important;
+  line-height: 1.45 !important;
   color: #2c1c08 !important;
-  margin-bottom: 18px !important;
 }
 
 .wr-page a,
@@ -272,6 +279,14 @@
     }
     .wr-page p {
         font-size: 16px;
+    }
+}
+
+@media (max-width: 768px) {
+    .wr-page {
+        height: 82vh;
+        max-height: 82vh;
+        padding: 18px 20px;
     }
 }
 

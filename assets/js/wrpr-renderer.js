@@ -4,6 +4,14 @@
  * - PDF.js has been fully removed; rendering is DOM-based for translation friendliness.
  * - Page navigation with localStorage progress resume is preserved.
  */
+// --- WRPR A6 PAGE CONSTANTS ---
+let PAGE_HEIGHT = 0; // runtime'da set edilecek
+const WRPR_PAGE_HEIGHT_DESKTOP = 720; // A6 sabit yükseklik (px)
+const WRPR_PAGE_HEIGHT_MOBILE_RATIO = 0.82; // ekranın %82'si (vh bazlı)
+let ORIGINAL_BODY = null;
+let CURRENT_PAGE = 0;
+let CURRENT_READER_ID = null;
+let MODAL_OPEN = false;
 (function () {
   const modal = document.getElementById('wrpr-modal');
   if (!modal) return;
@@ -19,14 +27,14 @@
   let currentPage = 0;
   let readerId = '';
   let htmlUrl = '';
-  let progressKey = '';
+  let storageKey = '';
   let isMobile = window.innerWidth <= 600;
 
   function setPageInfo(text) {
     if (pageInfoEl) pageInfoEl.textContent = text;
   }
 
-  function paginateFixed(bodyElement, pageHeight) {
+  function paginateFixed(bodyElement) {
     const pages = [];
     const source = bodyElement.cloneNode(true);
 
@@ -56,9 +64,14 @@
       if (node.nodeType === Node.TEXT_NODE && !node.textContent.trim()) return;
 
       const clone = node.cloneNode(true);
+      if (clone.nodeType === Node.ELEMENT_NODE) {
+        clone.style.breakInside = 'avoid';
+        clone.style.pageBreakInside = 'avoid';
+        clone.style.webkitColumnBreakInside = 'avoid';
+      }
       workingPage.appendChild(clone);
 
-      if (workingPage.scrollHeight > pageHeight) {
+      if (workingPage.scrollHeight > PAGE_HEIGHT) {
         workingPage.removeChild(clone);
 
         if (workingPage.childNodes.length) {
@@ -68,7 +81,7 @@
 
         workingPage.appendChild(clone);
 
-        if (workingPage.scrollHeight > pageHeight || workingPage.childNodes.length === 1) {
+        if (workingPage.scrollHeight > PAGE_HEIGHT || workingPage.childNodes.length === 1) {
           pages.push(workingPage.outerHTML);
           workingPage = createPage();
         }
@@ -94,6 +107,7 @@
     modal.style.display = 'flex';
     modal.setAttribute('aria-hidden', 'false');
     document.documentElement.style.overflow = 'hidden';
+    MODAL_OPEN = true;
   }
 
   function clearReader() {
@@ -102,37 +116,34 @@
     currentPage = 0;
     readerId = '';
     htmlUrl = '';
-    progressKey = '';
+    storageKey = '';
   }
 
   function hideModal() {
     modal.style.display = 'none';
     modal.setAttribute('aria-hidden', 'true');
     document.documentElement.style.overflow = '';
+    MODAL_OPEN = false;
     clearReader();
     setPageInfo('Page 1 / 1');
     updateNavState();
   }
 
   function saveProgress() {
-    if (!progressKey) return;
+    if (!storageKey) return;
     try {
-      localStorage.setItem(progressKey, String(currentPage));
+      localStorage.setItem(storageKey, CURRENT_PAGE);
     } catch (err) {
       console.warn('WRPR: unable to save progress', err);
     }
   }
 
-  function restoreProgress(totalPages) {
-    if (!progressKey) return 0;
-    try {
-      const raw = localStorage.getItem(progressKey);
-      const idx = parseInt(raw || '0', 10);
-      if (Number.isFinite(idx) && idx >= 0 && idx < totalPages) return idx;
-    } catch (err) {
-      console.warn('WRPR: unable to restore progress', err);
-    }
-    return 0;
+  function restoreProgress() {
+    if (!storageKey) return 0;
+    const saved = localStorage.getItem(storageKey);
+    if (!saved) return 0;
+    const page = parseInt(saved);
+    return isNaN(page) ? 0 : page;
   }
 
   function renderPage(index) {
@@ -160,6 +171,7 @@
     if (pageEl) readerContent.appendChild(pageEl);
 
     currentPage = index;
+    CURRENT_PAGE = index;
     setPageInfo(`Page ${index + 1} / ${WR_PAGES.length}`);
     saveProgress();
     updateNavState();
@@ -167,8 +179,17 @@
 
   async function openHTMLReader(url, rid) {
     readerId = rid || '';
+    CURRENT_READER_ID = readerId;
     htmlUrl = url || '';
-    progressKey = `wrpr_page_${readerId || 'default'}`;
+    const KEY = `wrpr_page_${readerId}_A6`;
+
+    Object.keys(localStorage).forEach(k => {
+      if (k.startsWith(`wrpr_page_${readerId}`) && !k.endsWith('_A6')) {
+        localStorage.removeItem(k);
+      }
+    });
+
+    storageKey = KEY;
 
     if (!htmlUrl) return;
 
@@ -186,10 +207,17 @@
       const parser = new DOMParser();
       const doc = parser.parseFromString(html, 'text/html');
       const body = doc.body || doc.documentElement;
-      const PAGE_HEIGHT = isMobile ? 1100 : 1400;
+      ORIGINAL_BODY = body.cloneNode(true);
+      const isMobile = window.innerWidth < 768;
 
-      WR_PAGES = paginateFixed(body, PAGE_HEIGHT);
-      const startIndex = Math.min(restoreProgress(WR_PAGES.length), Math.max(WR_PAGES.length - 1, 0));
+      if (isMobile) {
+        PAGE_HEIGHT = Math.floor(window.innerHeight * WRPR_PAGE_HEIGHT_MOBILE_RATIO);
+      } else {
+        PAGE_HEIGHT = WRPR_PAGE_HEIGHT_DESKTOP;
+      }
+
+      WR_PAGES = paginateFixed(ORIGINAL_BODY);
+      const startIndex = Math.min(restoreProgress(), Math.max(WR_PAGES.length - 1, 0));
       renderPage(startIndex);
     } catch (err) {
       console.error('WRPR load error', err);
@@ -267,8 +295,24 @@
 
   syncReaderHeight();
   window.addEventListener('resize', () => {
-    syncReaderHeight();
-    repaginateOnResize();
+    const isMobile = window.innerWidth < 768;
+
+    if (isMobile) {
+      PAGE_HEIGHT = Math.floor(window.innerHeight * WRPR_PAGE_HEIGHT_MOBILE_RATIO);
+    } else {
+      PAGE_HEIGHT = WRPR_PAGE_HEIGHT_DESKTOP;
+    }
+
+    if (!MODAL_OPEN) return;
+
+    const savedPage = CURRENT_PAGE || 0;
+
+    WR_PAGES = paginateFixed(ORIGINAL_BODY);
+
+    const maxPage = WR_PAGES.length - 1;
+    const nextPage = Math.min(savedPage, maxPage);
+
+    renderPage(nextPage);
   });
   window.addEventListener('orientationchange', () => {
     syncReaderHeight();
