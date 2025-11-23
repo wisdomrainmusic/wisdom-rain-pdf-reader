@@ -148,12 +148,6 @@ body.wrpr-modal-open {
   display: none;
 }
 
-/* WRPR modal — force visible when active */
-/* Prevent theme override breaking modal layout */
-#wrpr-modal[aria-hidden="false"] {
-  display: flex !important;
-}
-
 #wrpr-modal-content {
   position: relative;
   width: min(90vw, 960px);
@@ -174,99 +168,30 @@ body.wrpr-modal-open {
   touch-action: pinch-zoom pan-y;
 }
 
-/* Premium language menu */
-.wrpr-lang-menu {
-    display: flex;
-    justify-content: flex-end;
-    padding: 8px 20px 4px;
-    position: relative;
-    z-index: 50;
+#wrpr-translate-bar {
+  display: flex;
+  justify-content: flex-end;
+  padding: 10px 20px;
+  margin-bottom: 5px;
 }
 
-.wrpr-lang-current {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    background: #201810;
-    color: #f5d77c;
-    border-radius: 10px;
-    border: 1px solid #725a29;
-    padding: 6px 12px;
-    cursor: pointer;
-    font-size: 14px;
-    line-height: 1.4;
+#wrpr-lang-select {
+  background: #201810;
+  color: #f5d77c;
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid #725a29;
+  font-size: 15px;
+  cursor: pointer;
 }
 
-.wrpr-lang-current:hover {
-    border-color: #d6b05a;
+#wrpr-lang-select:hover {
+  border-color: #d6b05a;
 }
 
-.wrpr-lang-flag img {
-    width: 18px;
-    height: 12px;
-    display: block;
-    border-radius: 2px;
-}
-
-.wrpr-lang-caret {
-    font-size: 11px;
-    opacity: 0.8;
-}
-
-.wrpr-lang-options {
-    position: absolute;
-    right: 20px;
-    top: 36px;
-    background: #201810;
-    border-radius: 10px;
-    border: 1px solid #725a29;
-    padding: 4px 0;
-    display: none;
-    flex-direction: column;
-    min-width: 220px;
-    max-height: 260px;
-    overflow-y: auto;
-    box-shadow: 0 10px 25px rgba(0,0,0,0.45);
-}
-
-.wrpr-lang-options.open {
-    display: flex;
-}
-
-.wrpr-lang-option {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 6px 12px;
-    background: transparent;
-    border: none;
-    cursor: pointer;
-    color: #f5d77c;
-    font-size: 14px;
-    text-align: left;
-}
-
-.wrpr-lang-option:hover {
-    background: rgba(255,255,255,0.05);
-}
-
-.wrpr-lang-option .wrpr-lang-flag img {
-    width: 18px;
-    height: 12px;
-}
-
-/* Küçük ekranlarda menü okuyucı ekranına taşmasın */
-@media (max-width: 600px) {
-    .wrpr-lang-options {
-        right: 16px;
-        min-width: 180px;
-        max-height: 220px;
-    }
-
-    .wrpr-lang-current {
-        font-size: 13px;
-        padding: 5px 10px;
-    }
+#wrpr-lang-select option {
+  background: #201810;
+  color: #f5d77c;
 }
 
 /* ---- FIXED CLOSE BUTTON (RIGHT) ---- */
