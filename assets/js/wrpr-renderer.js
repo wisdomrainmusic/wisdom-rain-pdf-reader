@@ -550,22 +550,36 @@ function wrprApplyGoogleLanguage(lang) {
   });
 
   function bindReader(wrapper) {
+    if (wrapper.dataset.wrprBound === '1') return;
+    wrapper.dataset.wrprBound = '1';
+
     const wrapperReaderId = wrapper.dataset.readerId || '';
     const bookCards = [...wrapper.querySelectorAll('.wrpr-book-card')];
 
-    wrapper
-      .querySelectorAll(
-        '.wrpr-read-btn, .read-pdf-button, .wrpr-read-button, .btn-read, .button-read'
-      )
-      .forEach((btn) => {
-        btn.addEventListener('click', (event) => {
-          event.preventDefault();
-          const html = btn.dataset.html || '';
-          if (!html) return;
-          const rid = btn.dataset.reader || wrapperReaderId || 'default';
-          openHTMLReader(html, rid);
-        });
+    const readButtons = wrapper.querySelectorAll(
+      '[data-wrpr-read], [data-html], [data-url], .wrpr-read-btn, .read-pdf-button'
+    );
+
+    readButtons.forEach((btn) => {
+      btn.addEventListener('click', (event) => {
+        event.preventDefault();
+
+        const htmlUrl =
+          btn.dataset.html ||
+          btn.dataset.url ||
+          btn.getAttribute('data-html') ||
+          btn.getAttribute('data-url') ||
+          btn.getAttribute('href');
+
+        if (!htmlUrl) {
+          console.warn('WRPR: HTML URL bulunamadı:', btn);
+          return;
+        }
+
+        const rid = btn.dataset.reader || wrapperReaderId || 'default';
+        openHTMLReader(htmlUrl, rid);
       });
+    });
 
     const langSelects = wrapper.querySelectorAll('.wrpr-lang-select');
     if (!langSelects.length || !bookCards.length) return;
@@ -583,7 +597,24 @@ function wrprApplyGoogleLanguage(lang) {
     });
   }
 
-  document.querySelectorAll('.wrpr-reader-wrapper').forEach((wrapper) => bindReader(wrapper));
+  function initReader() {
+    document
+      .querySelectorAll('[data-wrpr-wrapper]')
+      .forEach((wrapper) => bindReader(wrapper));
+  }
+
+  document.addEventListener('DOMContentLoaded', initReader);
+  initReader();
+
+  const wrprObserver = new MutationObserver(() => {
+    document
+      .querySelectorAll('[data-wrpr-wrapper]')
+      .forEach((wrapper) => bindReader(wrapper));
+  });
+
+  if (document.body) {
+    wrprObserver.observe(document.body, { childList: true, subtree: true });
+  }
 
   applyPageHeight();
   syncReaderHeight();

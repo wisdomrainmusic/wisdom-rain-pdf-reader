@@ -148,6 +148,12 @@ body.wrpr-modal-open {
   display: none;
 }
 
+/* WRPR modal — force visible when active */
+/* Prevent theme override breaking modal layout */
+#wrpr-modal[aria-hidden="false"] {
+  display: flex !important;
+}
+
 #wrpr-modal-content {
   position: relative;
   width: min(90vw, 960px);
