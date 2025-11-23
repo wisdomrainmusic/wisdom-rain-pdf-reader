@@ -1,0 +1,73 @@
+.wrpr-reader-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.75);
+}
+
+.wrpr-reader-modal {
+  background: #f0c974;
+  border-radius: 16px;
+  max-width: 900px;
+  width: calc(100% - 40px);
+  max-height: min(90vh, 780px);
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+}
+
+.wrpr-reader-header,
+.wrpr-reader-footer {
+  padding: 16px 24px;
+  flex-shrink: 0;
+}
+
+.wrpr-reader-body {
+  flex: 1;
+  padding: 16px 24px 20px 24px;
+  overflow: hidden;
+}
+
+.wrpr-reader-scroll {
+  height: 100%;
+  overflow-y: auto;
+}
+
+.wrpr-reader-open html,
+.wrpr-reader-open body {
+  overflow: hidden;
+}
+
+.wrpr-page {
+  max-width: 680px;
+  margin: 0 auto;
+}
+
+.wrpr-reader-scroll p {
+  font-size: 1.125rem;
+  line-height: 1.6;
+  margin: 0 0 1rem 0;
+}
+
+.wrpr-reader-scroll ul {
+  margin: 0 0 1.2rem 0;
+  padding-left: 1.4rem;
+}
+
+.wrpr-reader-scroll li {
+  margin-bottom: 0.55rem;
+}
+
+.wrpr-reader-scroll strong {
+  font-weight: 700;
+}
+
+.wrpr-page-indicator {
+  margin-top: 8px;
+  text-align: center;
+  font-size: 0.9rem;
+  opacity: 0.9;
+}
