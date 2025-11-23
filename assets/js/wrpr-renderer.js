@@ -14,10 +14,8 @@ let ORIGINAL_BODY = null;
 let CURRENT_PAGE = 0;
 let CURRENT_READER_ID = null;
 let MODAL_OPEN = false;
-let wrprCurrentLang = 'en';
-let wrprLangMenu = null;
-let wrprLangCurrentBtn = null;
-let wrprLangOptions = null;
+let wrprCurrentLang = '';
+let wrprLangSelect = null;
 
 (function normalizeViewport() {
   try {
@@ -68,16 +66,6 @@ function computePageHeight() {
   const viewportCap = Math.floor(window.innerHeight * 0.92);
   return Math.max(400, Math.min(WRPR_BASE_PAGE_HEIGHT, viewportCap));
 }
-
-function wrprApplyGoogleLanguage(lang) {
-  const combo = document.querySelector('.goog-te-combo');
-  if (!combo) return;
-
-  const target = !lang || lang === 'en' ? '' : lang === 'zh-cn' ? 'zh-CN' : lang;
-
-  combo.value = target;
-  combo.dispatchEvent(new Event('change'));
-}
 (function () {
   const modal = document.getElementById('wrpr-modal');
   if (!modal) return;
@@ -88,77 +76,53 @@ function wrprApplyGoogleLanguage(lang) {
   const btnNext = modal.querySelector('#wrpr-next-page, #wrpr-next');
   const btnClose = modal.querySelector('#wrpr-close');
   const pageInfoEl = modal.querySelector('.wrpr-page-info');
-  wrprLangMenu = document.getElementById('wrpr-lang-menu');
-  wrprLangCurrentBtn = wrprLangMenu ? wrprLangMenu.querySelector('.wrpr-lang-current') : null;
-  wrprLangOptions = wrprLangMenu ? wrprLangMenu.querySelector('.wrpr-lang-options') : null;
+  wrprLangSelect = document.getElementById('wrpr-lang-select');
+  const translateSelect = wrprLangSelect || modal.querySelector('#wrpr-lang-select');
+  if (!translateSelect) {
+    wrprLangSelect = null;
+  } else {
+    wrprLangSelect = translateSelect;
 
-  function wrprUpdateCurrentLangUI(lang, label) {
-    if (!wrprLangCurrentBtn) return;
-
-    const currentFlag = wrprLangCurrentBtn.querySelector('.wrpr-lang-flag img');
-    const currentLabel = wrprLangCurrentBtn.querySelector('.wrpr-lang-label');
-
-    if (currentFlag) {
-      currentFlag.src = WRPR_URL + 'assets/flags/' + (lang === 'zh-cn' ? 'zh-cn' : lang) + '.svg';
+    const saved = window.localStorage.getItem('wrpr_lang') || '';
+    if (saved) {
+      wrprCurrentLang = saved;
+      wrprLangSelect.value = wrprCurrentLang;
+      setTimeout(() => {
+        const combo = document.querySelector('.goog-te-combo');
+        if (!combo) return;
+        if (wrprCurrentLang === 'en') {
+          combo.value = '';
+          combo.dispatchEvent(new Event('change'));
+        } else {
+          combo.value = wrprCurrentLang;
+          combo.dispatchEvent(new Event('change'));
+        }
+      }, 300);
     }
-    if (currentLabel && label) {
-      currentLabel.textContent = label;
-    }
+
+    wrprLangSelect.addEventListener('change', function (e) {
+      wrprCurrentLang = e.target.value || '';
+      window.localStorage.setItem('wrpr_lang', wrprCurrentLang);
+
+      const combo = document.querySelector('.goog-te-combo');
+      if (!combo) return;
+
+      if (wrprCurrentLang === 'en') {
+        combo.value = '';
+        combo.dispatchEvent(new Event('change'));
+      } else if (wrprCurrentLang) {
+        combo.value = wrprCurrentLang;
+        combo.dispatchEvent(new Event('change'));
+      }
+    });
   }
 
-  if (wrprLangMenu && wrprLangOptions) {
+  function wrprApplyGoogleLanguage(lang) {
+    const combo = document.querySelector('.goog-te-combo');
+    if (!combo) return;
 
-    // localStorage'dan dil al
-    const savedLang = window.localStorage.getItem('wrpr_lang') || 'en';
-    wrprCurrentLang = savedLang;
-
-    // Varsayılan: English (Original)
-    let initialLabel = 'English (Original)';
-
-    const savedOption = wrprLangOptions.querySelector('.wrpr-lang-option[data-lang="' + savedLang + '"]');
-    if (savedOption) {
-      const t = savedOption.querySelector('.wrpr-lang-text');
-      if (t) {
-        initialLabel = t.textContent;
-      }
-    }
-
-    wrprUpdateCurrentLangUI(wrprCurrentLang, initialLabel);
-
-    // İlk açılışta çeviriyi uygula (English ise reset)
-    setTimeout(function () {
-      wrprApplyGoogleLanguage(wrprCurrentLang);
-    }, 300);
-
-    // Aç/kapa davranışı
-    wrprLangCurrentBtn.addEventListener('click', function (e) {
-      e.stopPropagation();
-      wrprLangOptions.classList.toggle('open');
-    });
-
-    document.addEventListener('click', function () {
-      if (wrprLangOptions.classList.contains('open')) {
-        wrprLangOptions.classList.remove('open');
-      }
-    });
-
-    // Seçenek tıklanınca dil ayarla
-    wrprLangOptions.querySelectorAll('.wrpr-lang-option').forEach(function (btn) {
-      btn.addEventListener('click', function (e) {
-        e.preventDefault();
-        const lang = btn.getAttribute('data-lang') || 'en';
-        const labelEl = btn.querySelector('.wrpr-lang-text');
-        const label = labelEl ? labelEl.textContent : 'English (Original)';
-
-        wrprCurrentLang = lang;
-        window.localStorage.setItem('wrpr_lang', wrprCurrentLang);
-
-        wrprUpdateCurrentLangUI(lang, label);
-        wrprLangOptions.classList.remove('open');
-
-        wrprApplyGoogleLanguage(lang);
-      });
-    });
+    combo.value = lang;
+    combo.dispatchEvent(new Event('change'));
   }
 
   let WR_PAGES = [];
@@ -451,14 +415,15 @@ function wrprApplyGoogleLanguage(lang) {
     saveProgress();
     updateNavState();
     wrprTriggerTranslateRefresh();
+    if (wrprLangSelect && wrprCurrentLang && wrprLangSelect.value !== wrprCurrentLang) {
+      wrprLangSelect.value = wrprCurrentLang;
+    }
     if (wrprCurrentLang && wrprCurrentLang !== 'en') {
-      setTimeout(function () {
-        wrprApplyGoogleLanguage(wrprCurrentLang);
-      }, 100);
-    } else {
-      // English (Original) ise garanti olsun diye reset
-      setTimeout(function () {
-        wrprApplyGoogleLanguage('en');
+      setTimeout(() => {
+        const combo = document.querySelector('.goog-te-combo');
+        if (!combo) return;
+        combo.value = wrprCurrentLang;
+        combo.dispatchEvent(new Event('change'));
       }, 100);
     }
   }
@@ -550,34 +515,16 @@ function wrprApplyGoogleLanguage(lang) {
   });
 
   function bindReader(wrapper) {
-    if (wrapper.dataset.wrprBound === '1') return;
-    wrapper.dataset.wrprBound = '1';
-
     const wrapperReaderId = wrapper.dataset.readerId || '';
     const bookCards = [...wrapper.querySelectorAll('.wrpr-book-card')];
 
-    const readButtons = wrapper.querySelectorAll(
-      '[data-wrpr-read], [data-html], [data-url], .wrpr-read-btn, .read-pdf-button'
-    );
-
-    readButtons.forEach((btn) => {
+    wrapper.querySelectorAll('.wrpr-read-btn').forEach((btn) => {
       btn.addEventListener('click', (event) => {
         event.preventDefault();
-
-        const htmlUrl =
-          btn.dataset.html ||
-          btn.dataset.url ||
-          btn.getAttribute('data-html') ||
-          btn.getAttribute('data-url') ||
-          btn.getAttribute('href');
-
-        if (!htmlUrl) {
-          console.warn('WRPR: HTML URL bulunamadı:', btn);
-          return;
-        }
-
+        const html = btn.dataset.html || '';
+        if (!html) return;
         const rid = btn.dataset.reader || wrapperReaderId || 'default';
-        openHTMLReader(htmlUrl, rid);
+        openHTMLReader(html, rid);
       });
     });
 
@@ -597,24 +544,7 @@ function wrprApplyGoogleLanguage(lang) {
     });
   }
 
-  function initReader() {
-    document
-      .querySelectorAll('[data-wrpr-wrapper]')
-      .forEach((wrapper) => bindReader(wrapper));
-  }
-
-  document.addEventListener('DOMContentLoaded', initReader);
-  initReader();
-
-  const wrprObserver = new MutationObserver(() => {
-    document
-      .querySelectorAll('[data-wrpr-wrapper]')
-      .forEach((wrapper) => bindReader(wrapper));
-  });
-
-  if (document.body) {
-    wrprObserver.observe(document.body, { childList: true, subtree: true });
-  }
+  document.querySelectorAll('.wrpr-reader-wrapper').forEach((wrapper) => bindReader(wrapper));
 
   applyPageHeight();
   syncReaderHeight();
