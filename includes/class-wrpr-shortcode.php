@@ -45,9 +45,7 @@ class WRPR_Shortcode {
 
         ob_start();
         ?>
-        <div class="wrpr-reader-wrapper"
-             data-reader-id="<?php echo esc_attr( $reader_id ); ?>"
-             data-wrpr-wrapper="1">
+        <div class="wrpr-reader-wrapper" data-reader-id="<?php echo esc_attr( $reader_id ); ?>">
             <div class="wrpr-header">
                 <h2><?php echo esc_html( $reader['name'] ); ?></h2>
 
@@ -80,9 +78,7 @@ class WRPR_Shortcode {
 
                         <div class="wrpr-actions">
                             <button class="wrpr-read-btn"
-                                data-wrpr-read="1"
                                 data-html="<?php echo esc_url( $pdf_url ); ?>"
-                                data-url="<?php echo esc_url( $pdf_url ); ?>"
                                 data-reader="<?php echo esc_attr( $reader_id ); ?>">
                                 Read
                             </button>
