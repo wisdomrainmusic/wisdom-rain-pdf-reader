@@ -1,523 +1,505 @@
-/**
- * Wisdom Rain Reader (HTML/Word Edition)
- * - Uses HTML/Word-converted pages with .wr-page elements instead of PDF.js canvases.
- * - PDF.js has been fully removed; rendering is DOM-based for translation friendliness.
- * - Page navigation with localStorage progress resume is preserved.
- */
-// --- WRPR A6 PAGE CONSTANTS ---
-const WRPR_BASE_PAGE_HEIGHT = 680; // A6 içerik yüksekliği (px)
-const WRPR_MODAL_BUFFER = 180; // nav/info yüksekliği için ek alan
-const WRPR_RESIZE_DEBOUNCE = 180;
-
-let PAGE_HEIGHT = 0; // runtime'da set edilecek
-let ORIGINAL_BODY = null;
-let CURRENT_PAGE = 0;
-let CURRENT_READER_ID = null;
-let MODAL_OPEN = false;
-let wrprCurrentLang = '';
-let wrprLangSelect = null;
-
-(function normalizeViewport() {
-  try {
-    const metas = document.querySelectorAll('meta[name="viewport"]');
-    if (!metas.length) return;
-
-    metas.forEach((meta) => {
-      meta.setAttribute(
-        'content',
-        'width=device-width, initial-scale=1.0, maximum-scale=5, user-scalable=yes'
-      );
-    });
-  } catch (e) {
-    console.error('WRPR viewport normalize error', e);
-  }
-})();
-
-async function cleanRemoteHTML(html) {
-  if (!html || typeof wrprCleanerData === 'undefined' || !wrprCleanerData.ajaxUrl) {
-    return html || '';
-  }
-
-  try {
-    const params = new URLSearchParams();
-    params.append('action', 'wrpr_clean_html');
-    params.append('nonce', wrprCleanerData.nonce || '');
-    params.append('html', html);
-
-    const response = await fetch(wrprCleanerData.ajaxUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' },
-      body: params,
-    });
-
-    if (!response.ok) return html;
-    const result = await response.json();
-    if (result && result.success && typeof result.data === 'string') {
-      return result.data;
-    }
-  } catch (err) {
-    console.warn('WRPR cleanHTML failed', err);
-  }
-
-  return html;
-}
-
-function computePageHeight() {
-  const viewportCap = Math.floor(window.innerHeight * 0.92);
-  return Math.max(400, Math.min(WRPR_BASE_PAGE_HEIGHT, viewportCap));
-}
 (function () {
+  // --- PDF.js init ---
+  if (typeof window.pdfjsLib === 'undefined' && window['pdfjs-dist/build/pdf']) {
+    window.pdfjsLib = window['pdfjs-dist/build/pdf'];
+  }
+
+  if (window.pdfjsLib && window.pdfjsLib.GlobalWorkerOptions) {
+    window.pdfjsLib.GlobalWorkerOptions.workerSrc =
+      'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+  }
+
+  // --- Modal setup ---
   const modal = document.getElementById('wrpr-modal');
-  if (!modal) return;
+  const modalContent = modal ? modal.querySelector('#wrpr-modal-content') : null;
+  const canvasEl = modal ? modal.querySelector('#wrpr-pdf-canvas') : null;
+  const btnPrev = modal ? modal.querySelector('#wrpr-prev') : null;
+  const btnNext = modal ? modal.querySelector('#wrpr-next') : null;
+  const btnClose = modal ? modal.querySelector('#wrpr-close') : null;
+  const pageInfoEl = modal ? modal.querySelector('.wrpr-page-info') : null;
 
-  const modalContent = modal.querySelector('#wrpr-modal-content');
-  const readerContent = modal.querySelector('#wrpr-reader-content');
-  const btnPrev = modal.querySelector('#wrpr-prev-page, #wrpr-prev');
-  const btnNext = modal.querySelector('#wrpr-next-page, #wrpr-next');
-  const btnClose = modal.querySelector('#wrpr-close');
-  const pageInfoEl = modal.querySelector('.wrpr-page-info');
-  wrprLangSelect = document.getElementById('wrpr-lang-select');
-  const translateSelect = wrprLangSelect || modal.querySelector('#wrpr-lang-select');
-  if (!translateSelect) {
-    wrprLangSelect = null;
-  } else {
-    wrprLangSelect = translateSelect;
+  const hasFullscreenSupport =
+    !!modal && typeof modal.requestFullscreen === 'function' && typeof document.exitFullscreen === 'function';
 
-    const saved = window.localStorage.getItem('wrpr_lang') || '';
-    if (saved) {
-      wrprCurrentLang = saved;
-      wrprLangSelect.value = wrprCurrentLang;
-      setTimeout(() => {
-        const combo = document.querySelector('.goog-te-combo');
-        if (!combo) return;
-        if (wrprCurrentLang === 'en') {
-          combo.value = '';
-          combo.dispatchEvent(new Event('change'));
-        } else {
-          combo.value = wrprCurrentLang;
-          combo.dispatchEvent(new Event('change'));
-        }
-      }, 300);
+  // --------------------------------------------------
+  //  FAST CLICK HELPER (tap latency fix)
+  // --------------------------------------------------
+  function bindFastAction(element, handler) {
+    if (!element || typeof handler !== 'function') return;
+
+    const getNow = () =>
+      typeof performance !== 'undefined' && performance && typeof performance.now === 'function'
+        ? performance.now()
+        : Date.now();
+
+    let lastFastInvocation = 0;
+
+    element.addEventListener('click', (event) => {
+      if (getNow() - lastFastInvocation < 250) return;
+      handler(event);
+    });
+
+    const invokeFast = (event) => {
+      lastFastInvocation = getNow();
+      if (event && typeof event.preventDefault === 'function') event.preventDefault();
+      handler(event);
+    };
+
+    if (window.PointerEvent) {
+      element.addEventListener(
+        'pointerup',
+        (event) => {
+          if (event.pointerType && event.pointerType !== 'mouse') invokeFast(event);
+        },
+        { passive: false }
+      );
+    } else {
+      element.addEventListener(
+        'touchend',
+        (event) => invokeFast(event),
+        { passive: false }
+      );
     }
+  }
 
-    wrprLangSelect.addEventListener('change', function (e) {
-      wrprCurrentLang = e.target.value || '';
-      window.localStorage.setItem('wrpr_lang', wrprCurrentLang);
+  // --------------------------------------------------
+  //  SAFE AREA (NOTCH)
+  // --------------------------------------------------
+  let safeAreaCache = { top: 0, right: 0, bottom: 0, left: 0 };
+  let safeAreaDirty = true;
 
-      const combo = document.querySelector('.goog-te-combo');
-      if (!combo) return;
+  function refreshSafeAreaCache() {
+    const rootStyle = window.getComputedStyle(document.documentElement);
+    const parseInset = (name) => {
+      const raw = rootStyle.getPropertyValue(`--wrpr-safe-area-${name}`);
+      const value = parseFloat(raw);
+      return Number.isFinite(value) ? value : 0;
+    };
+    safeAreaCache = {
+      top: parseInset('top'),
+      right: parseInset('right'),
+      bottom: parseInset('bottom'),
+      left: parseInset('left'),
+    };
+    safeAreaDirty = false;
+  }
 
-      if (wrprCurrentLang === 'en') {
-        combo.value = '';
-        combo.dispatchEvent(new Event('change'));
-      } else if (wrprCurrentLang) {
-        combo.value = wrprCurrentLang;
-        combo.dispatchEvent(new Event('change'));
+  function markSafeAreaDirty() {
+    safeAreaDirty = true;
+  }
+
+  function getSafeAreaInsets() {
+    if (safeAreaDirty) refreshSafeAreaCache();
+    return safeAreaCache;
+  }
+
+  // --------------------------------------------------
+  //  FULLSCREEN BUTTON (DESKTOP ONLY)
+  // --------------------------------------------------
+  function wrprAddFullscreenButton(targetModal) {
+    if (!targetModal || targetModal.querySelector('.wrpr-fs-btn')) return null;
+
+    // Only desktop
+    if (window.innerWidth <= 1024) return null;
+
+    const fsBtn = document.createElement('button');
+    fsBtn.className = 'wrpr-fs-btn';
+    fsBtn.type = 'button';
+    fsBtn.innerHTML = '⤢';
+    fsBtn.title = 'Toggle Fullscreen';
+    fsBtn.setAttribute('aria-pressed', 'false');
+    fsBtn.setAttribute('aria-label', 'Toggle fullscreen');
+
+    const syncState = () => {
+      const isActive = document.fullscreenElement === targetModal;
+      fsBtn.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+      fsBtn.classList.toggle('wrpr-fs-btn--active', isActive);
+    };
+
+    bindFastAction(fsBtn, () => {
+      if (!document.fullscreenElement) {
+        targetModal.requestFullscreen().catch(console.warn);
+      } else if (typeof document.exitFullscreen === 'function') {
+        const result = document.exitFullscreen();
+        if (result && typeof result.catch === 'function') result.catch(console.warn);
       }
     });
+
+    document.addEventListener('fullscreenchange', syncState);
+    syncState();
+
+    targetModal.appendChild(fsBtn);
+    return fsBtn;
   }
 
-  function wrprApplyGoogleLanguage(lang) {
-    const combo = document.querySelector('.goog-te-combo');
-    if (!combo) return;
+  if (hasFullscreenSupport) wrprAddFullscreenButton(modal);
 
-    combo.value = lang;
-    combo.dispatchEvent(new Event('change'));
-  }
-
-  let WR_PAGES = [];
-  let currentPage = 0;
+  // --------------------------------------------------
+  //  RENDER STATE
+  // --------------------------------------------------
+  let pdfDoc = null;
+  let currentPage = 1;
   let readerId = '';
-  let htmlUrl = '';
-  let storageKey = '';
-  let resizeTimer = null;
+  let pdfUrl = '';
+  let loadingTask = null;
+  let pendingPage = null;
+  let progressKey = '';
+  let progressTimer = null;
+  let pendingProgress = null;
+  let renderCycle = 0;
+  let renderFrameToken = null;
 
+  if (typeof window.renderLock !== 'boolean') window.renderLock = false;
+
+  // --------------------------------------------------
+  //  ZOOM & PAN STATE (Persistent)
+  // --------------------------------------------------
+  let zoomLevel = 1;
+  const MIN_ZOOM = 1;
+  const MAX_ZOOM = 3;
+  let offsetX = 0;
+  let offsetY = 0;
+
+  function applyCanvasTransform() {
+    if (!canvasEl) return;
+    canvasEl.style.transform = `translate3d(${offsetX}px, ${offsetY}px, 0) scale(${zoomLevel})`;
+  }
+
+  function resetTransform() {
+    zoomLevel = 1;
+    offsetX = 0;
+    offsetY = 0;
+    applyCanvasTransform();
+  }
+
+  // --------------------------------------------------
+  //  PAGE INFO
+  // --------------------------------------------------
   function setPageInfo(text) {
     if (pageInfoEl) pageInfoEl.textContent = text;
   }
 
-  function createCloneWithText(node, text) {
-    const shallow = node.cloneNode(false);
-    shallow.textContent = text;
-    shallow.style.breakInside = 'avoid';
-    shallow.style.pageBreakInside = 'avoid';
-    shallow.style.webkitColumnBreakInside = 'avoid';
-    return shallow;
-  }
-
-  function splitTextNodeToFit(node, page, maxHeight) {
-    const originalText = (node.textContent || '').trim();
-    if (!originalText) return null;
-
-    const attemptSplit = (parts) => {
-      let low = 1;
-      let high = parts.length;
-      let best = 0;
-
-      while (low <= high) {
-        const mid = Math.floor((low + high) / 2);
-        const firstText = parts.slice(0, mid).join(' ');
-        const clone = createCloneWithText(node, firstText);
-        page.appendChild(clone);
-        const fits = page.scrollHeight <= maxHeight;
-        page.removeChild(clone);
-
-        if (fits) {
-          best = mid;
-          low = mid + 1;
-        } else {
-          high = mid - 1;
-        }
-      }
-
-      if (!best) return null;
-
-      const first = createCloneWithText(node, parts.slice(0, best).join(' '));
-      const remainder = parts.slice(best).join(' ');
-      const second = remainder ? createCloneWithText(node, remainder) : null;
-      return { first, second };
-    };
-
-    const words = originalText.split(/\s+/).filter(Boolean);
-    let result = attemptSplit(words);
-
-    if (!result && words.length === 1) {
-      const chars = originalText.split('');
-      result = attemptSplit(chars);
+  function updatePageInfo() {
+    if (!pdfDoc) {
+      setPageInfo('Loading PDF...');
+      return;
     }
-
-    return result;
-  }
-
-  function cleanWrapperNodes(root) {
-    const walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT, null);
-    const toRemove = [];
-    while (walker.nextNode()) {
-      const node = walker.currentNode;
-      if (node.tagName === 'SPAN' && !node.attributes.length && !node.textContent.trim()) {
-        toRemove.push(node);
-      }
-      if (node.tagName === 'DIV' && !node.attributes.length && !node.textContent.trim()) {
-        toRemove.push(node);
-      }
-    }
-    toRemove.forEach((n) => n.parentNode && n.parentNode.removeChild(n));
-  }
-
-  function paginateFixed(bodyElement) {
-    const pages = [];
-    const source = bodyElement.cloneNode(true);
-    cleanWrapperNodes(source);
-
-    const measurementContainer = document.createElement('div');
-    measurementContainer.style.position = 'absolute';
-    measurementContainer.style.visibility = 'hidden';
-    measurementContainer.style.pointerEvents = 'none';
-    measurementContainer.style.left = '0';
-    measurementContainer.style.top = '0';
-    measurementContainer.style.width = readerContent
-      ? `${readerContent.clientWidth || readerContent.offsetWidth || 640}px`
-      : '100%';
-    measurementContainer.style.opacity = '0';
-
-    document.body.appendChild(measurementContainer);
-
-    const createPage = () => {
-      const page = document.createElement('div');
-      page.className = 'wr-page';
-      page.style.height = `${PAGE_HEIGHT}px`;
-      measurementContainer.appendChild(page);
-      return page;
-    };
-
-    let workingPage = createPage();
-    const nodes = Array.from(source.childNodes);
-
-    for (let i = 0; i < nodes.length; i++) {
-      const node = nodes[i];
-
-      if (node.nodeType === 3 && !node.textContent.trim()) continue;
-      if (node.tagName === 'P' && node.textContent.trim().length === 0) continue;
-
-      const isHeading = ['H1', 'H2', 'H3'].includes(node.tagName);
-      const nextNode = nodes[i + 1];
-
-      const prepareClone = (n) => {
-        const c = n.cloneNode(true);
-        if (c.nodeType === Node.ELEMENT_NODE) {
-          c.style.breakInside = 'avoid';
-          c.style.pageBreakInside = 'avoid';
-          c.style.webkitColumnBreakInside = 'avoid';
-        }
-        return c;
-      };
-
-      if (isHeading && workingPage.childNodes.length === 0 && nextNode) {
-        const headingClone = prepareClone(node);
-        workingPage.appendChild(headingClone);
-        const headingHeight = workingPage.scrollHeight;
-        if (headingHeight <= PAGE_HEIGHT * 0.4) {
-          const nextClone = prepareClone(nextNode);
-          workingPage.appendChild(nextClone);
-          if (workingPage.scrollHeight > PAGE_HEIGHT) {
-            workingPage.removeChild(nextClone);
-          } else {
-            i += 1;
-            continue;
-          }
-        }
-        workingPage.removeChild(headingClone);
-      }
-
-      const clone = prepareClone(node);
-      workingPage.appendChild(clone);
-
-      if (workingPage.scrollHeight > PAGE_HEIGHT) {
-        workingPage.removeChild(clone);
-
-        if (clone.tagName === 'P' || ['H1', 'H2', 'H3'].includes(clone.tagName)) {
-          const splitResult = splitTextNodeToFit(clone, workingPage, PAGE_HEIGHT);
-          if (splitResult) {
-            workingPage.appendChild(splitResult.first);
-            if (workingPage.scrollHeight <= PAGE_HEIGHT) {
-              pages.push(workingPage.outerHTML);
-              workingPage = createPage();
-            } else {
-              workingPage.removeChild(splitResult.first);
-            }
-
-            if (splitResult.second) {
-              nodes.splice(i + 1, 0, splitResult.second);
-            }
-            continue;
-          }
-        }
-
-        if (workingPage.childNodes.length) {
-          pages.push(workingPage.outerHTML);
-          workingPage = createPage();
-        }
-
-        workingPage.appendChild(clone);
-
-        if (workingPage.scrollHeight > PAGE_HEIGHT) {
-          pages.push(workingPage.outerHTML);
-          workingPage = createPage();
-        }
-      }
-    }
-
-    if (workingPage.childNodes.length) {
-      pages.push(workingPage.outerHTML);
-    }
-
-    document.body.removeChild(measurementContainer);
-
-    return pages;
+    setPageInfo(`Page ${currentPage} / ${pdfDoc.numPages}`);
   }
 
   function updateNavState() {
-    const hasPages = WR_PAGES.length > 0;
-    if (btnPrev) btnPrev.disabled = !hasPages || currentPage <= 0;
-    if (btnNext) btnNext.disabled = !hasPages || currentPage >= WR_PAGES.length - 1;
-  }
+    const hasDoc = !!pdfDoc;
 
-  function applyPageHeight() {
-    PAGE_HEIGHT = computePageHeight();
-    document.documentElement.style.setProperty('--wrpr-page-height', `${PAGE_HEIGHT}px`);
-  }
-
-  function wrprTriggerTranslateRefresh() {
-    try {
-      const evt = document.createEvent('HTMLEvents');
-      evt.initEvent('DOMNodeInserted', true, true);
-      document.body.dispatchEvent(evt);
-    } catch (e) {
-      console.error('WRPR translate refresh error', e);
+    if (btnPrev) {
+      const disabled = !hasDoc || currentPage <= 1;
+      btnPrev.disabled = disabled;
+    }
+    if (btnNext) {
+      const disabled = !hasDoc || currentPage >= pdfDoc.numPages;
+      btnNext.disabled = disabled;
     }
   }
 
+  // --------------------------------------------------
+  //  MODAL OPEN/CLOSE
+  // --------------------------------------------------
   function showModal() {
     modal.style.display = 'flex';
     modal.setAttribute('aria-hidden', 'false');
-    document.body.classList.add('wrpr-modal-open');
-    document.documentElement.classList.add('wrpr-reader-open');
-    document.body.classList.add('wrpr-reader-open');
-    MODAL_OPEN = true;
+    document.documentElement.style.overflow = 'hidden';
   }
 
-  function clearReader() {
-    if (readerContent) readerContent.innerHTML = '';
-    WR_PAGES = [];
-    currentPage = 0;
-    readerId = '';
-    htmlUrl = '';
-    storageKey = '';
+  function clearCanvas() {
+    const ctx = canvasEl.getContext('2d');
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.clearRect(0, 0, canvasEl.width, canvasEl.height);
+
+    canvasEl.removeAttribute('width');
+    canvasEl.removeAttribute('height');
+    canvasEl.style.width = '';
+    canvasEl.style.height = '';
+    canvasEl.style.transform = '';
   }
 
   function hideModal() {
     modal.style.display = 'none';
     modal.setAttribute('aria-hidden', 'true');
-    document.body.classList.remove('wrpr-modal-open');
-    document.documentElement.classList.remove('wrpr-reader-open');
-    document.body.classList.remove('wrpr-reader-open');
-    MODAL_OPEN = false;
-    clearReader();
-    setPageInfo('Page 1 / 1');
+    document.documentElement.style.overflow = '';
+
+    clearCanvas();
+    resetTransform();
+
+    if (pdfDoc) {
+      try { pdfDoc.destroy(); } catch (_) {}
+    }
+    pdfDoc = null;
+
+    if (loadingTask && typeof loadingTask.destroy === 'function') {
+      try { loadingTask.destroy(); } catch (_) {}
+    }
+    loadingTask = null;
+
+    flushProgressWrite();
+    progressKey = '';
+    pendingProgress = null;
+
+    if (progressTimer) clearTimeout(progressTimer);
+    if (renderFrameToken !== null) cancelAnimationFrame(renderFrameToken);
+
+    pendingPage = null;
+    renderCycle = 0;
+    window.renderLock = false;
+
+    currentPage = 1;
     updateNavState();
+    setPageInfo('Loading PDF...');
   }
 
-  function saveProgress() {
-    if (!storageKey) return;
-    try {
-      localStorage.setItem(storageKey, CURRENT_PAGE);
-    } catch (err) {
-      console.warn('WRPR: unable to save progress', err);
+  // --------------------------------------------------
+  //  PROGRESS SAVE
+  // --------------------------------------------------
+  function saveProgress(page) {
+    if (!progressKey) return;
+    pendingProgress = page;
+
+    if (progressTimer) clearTimeout(progressTimer);
+
+    progressTimer = setTimeout(() => {
+      try {
+        localStorage.setItem(progressKey, String(pendingProgress));
+      } catch (_) {}
+      progressTimer = null;
+    }, 200);
+  }
+
+  function flushProgressWrite() {
+    if (!progressKey) return;
+    if (progressTimer) clearTimeout(progressTimer);
+    if (pendingProgress != null) {
+      try {
+        localStorage.setItem(progressKey, String(pendingProgress));
+      } catch (_) {}
     }
   }
 
-  function restoreProgress() {
-    if (!storageKey) return 0;
-    const saved = localStorage.getItem(storageKey);
-    if (!saved) return 0;
-    const page = parseInt(saved);
-    return isNaN(page) ? 0 : page;
+  // --------------------------------------------------
+  //  RESPONSIVE SCALE
+  // --------------------------------------------------
+  function computeResponsiveScale(viewport) {
+    const safe = getSafeAreaInsets();
+
+    let containerWidth, containerHeight;
+
+    if (modalContent) {
+      const rect = modalContent.getBoundingClientRect();
+      containerWidth = rect.width;
+      containerHeight = rect.height;
+    } else {
+      containerWidth = window.innerWidth - safe.left - safe.right;
+      containerHeight = window.innerHeight - safe.top - safe.bottom;
+    }
+
+    const maxWidth = Math.max(0, containerWidth * 0.98);
+    const maxHeight = Math.max(0, containerHeight * 0.86);
+
+    const widthScale = maxWidth / viewport.width;
+    const heightScale = maxHeight / viewport.height;
+
+    return Math.min(widthScale, heightScale, 1);
   }
 
-  function renderPage(index) {
-    if (!readerContent) return;
-    if (!WR_PAGES.length) {
-      readerContent.innerHTML = '<div class="wr-page"><p>No content available.</p></div>';
-      setPageInfo('Page 0 / 0');
+  // --------------------------------------------------
+  //  RENDER LOOP
+  // --------------------------------------------------
+  function ensureRenderLoop() {
+    if (renderFrameToken !== null) return;
+    renderFrameToken = requestAnimationFrame(() => {
+      renderFrameToken = null;
+      if (!window.renderLock) processRenderQueue();
+      else ensureRenderLoop();
+    });
+  }
+
+  function requestRender(num) {
+    if (!pdfDoc || !canvasEl) return;
+    pendingPage = num;
+    ensureRenderLoop();
+  }
+
+  async function processRenderQueue() {
+    if (!pdfDoc || !canvasEl) return;
+    if (window.renderLock) return;
+
+    window.renderLock = true;
+    try {
+      while (pendingPage !== null) {
+        const pageToRender = pendingPage;
+        pendingPage = null;
+        await renderPageInternal(pageToRender);
+      }
+    } finally {
+      window.renderLock = false;
+      if (pendingPage !== null) ensureRenderLoop();
+    }
+  }
+
+  async function renderPageInternal(num) {
+    if (!pdfDoc || !canvasEl) return;
+
+    const activeDoc = pdfDoc;
+    const activeKey = progressKey;
+
+    try {
+      const cycleId = ++renderCycle;
+
+      canvasEl.classList.add('wrpr-canvas-fade-out');
+
+      const page = await activeDoc.getPage(num);
+
+      const baseViewport = page.getViewport({ scale: 1 });
+      const scale = computeResponsiveScale(baseViewport);
+      const viewport = page.getViewport({ scale });
+
+      const ctx = canvasEl.getContext('2d');
+      const outputScale = window.devicePixelRatio || 1;
+
+      const targetW = Math.floor(viewport.width * outputScale);
+      const targetH = Math.floor(viewport.height * outputScale);
+
+      canvasEl.width = targetW;
+      canvasEl.height = targetH;
+
+      canvasEl.style.width = `${viewport.width}px`;
+      canvasEl.style.height = `${viewport.height}px`;
+
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.clearRect(0, 0, canvasEl.width, canvasEl.height);
+
+      const renderContext = { canvasContext: ctx, viewport };
+      if (outputScale !== 1) {
+        renderContext.transform = [outputScale, 0, 0, outputScale, 0, 0];
+      }
+
+      await page.render(renderContext).promise;
+
+      if (!pdfDoc || pdfDoc !== activeDoc || cycleId !== renderCycle) return;
+
+      requestAnimationFrame(() => {
+        canvasEl.classList.remove('wrpr-canvas-fade-out');
+
+        // -------------------------
+        // 🔥 HERE: PERSISTENT ZOOM
+        // -------------------------
+        applyCanvasTransform();
+      });
+
+      currentPage = num;
+      updatePageInfo();
       updateNavState();
+
+      if (progressKey === activeKey) saveProgress(num);
+    } catch (err) {
+      canvasEl.classList.remove('wrpr-canvas-fade-out');
+      setPageInfo(`PDF render error: ${err.message}`);
+    }
+  }
+
+  // --------------------------------------------------
+  //  OPEN PDF
+  // --------------------------------------------------
+  async function openPDF(url, rid) {
+    readerId = rid;
+    pdfUrl = url;
+
+    flushProgressWrite();
+    progressKey = `wrpr_progress_${readerId}_${pdfUrl}`;
+
+    resetTransform();
+    showModal();
+    setPageInfo('Loading PDF...');
+    updateNavState();
+
+    if (!window.pdfjsLib || typeof window.pdfjsLib.getDocument !== 'function') {
+      setPageInfo('PDF.js not available.');
       return;
     }
 
-    const pageHTML = WR_PAGES[index];
-    if (!pageHTML) return;
-
-    const wrapper = document.createElement('div');
-    wrapper.innerHTML = pageHTML;
-    const pageEl = wrapper.firstElementChild;
-
-    if (pageEl) {
-      pageEl.setAttribute('data-page', index + 1);
-      if (!pageEl.classList.contains('wr-page')) pageEl.classList.add('wr-page');
-    }
-
-    readerContent.innerHTML = '';
-    if (pageEl) {
-      const shell = document.createElement('div');
-      shell.className = 'wr-page-shell';
-      shell.appendChild(pageEl);
-      readerContent.appendChild(shell);
-    }
-
-    currentPage = index;
-    CURRENT_PAGE = index;
-    setPageInfo(`Page ${index + 1} / ${WR_PAGES.length}`);
-    saveProgress();
-    updateNavState();
-    wrprTriggerTranslateRefresh();
-    if (wrprLangSelect && wrprCurrentLang && wrprLangSelect.value !== wrprCurrentLang) {
-      wrprLangSelect.value = wrprCurrentLang;
-    }
-    if (wrprCurrentLang && wrprCurrentLang !== 'en') {
-      setTimeout(() => {
-        const combo = document.querySelector('.goog-te-combo');
-        if (!combo) return;
-        combo.value = wrprCurrentLang;
-        combo.dispatchEvent(new Event('change'));
-      }, 100);
-    }
-  }
-
-  async function openHTMLReader(url, rid) {
-    readerId = rid || '';
-    CURRENT_READER_ID = readerId;
-    htmlUrl = url || '';
-    const KEY = `wrpr_page_${readerId}_A6`;
-
-    Object.keys(localStorage).forEach(k => {
-      if (k.startsWith(`wrpr_page_${readerId}`) && !k.endsWith('_A6')) {
-        localStorage.removeItem(k);
-      }
-    });
-
-    storageKey = KEY;
-
-    if (!htmlUrl) return;
-
-    showModal();
-    setPageInfo('Loading...');
-    updateNavState();
-
     try {
-      const response = await fetch(htmlUrl, { cache: 'no-cache' });
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      const rawHtml = await response.text();
-      const cleanHtml = await cleanRemoteHTML(rawHtml);
-
-      const parser = new DOMParser();
-      let doc = parser.parseFromString(cleanHtml, 'text/html');
-      if (!doc.body) {
-        const safeHtml = `<html><body>${cleanHtml}</body></html>`;
-        doc = parser.parseFromString(safeHtml, 'text/html');
+      if (loadingTask && typeof loadingTask.destroy === 'function') {
+        try { loadingTask.destroy(); } catch (_) {}
       }
 
-      const body = doc.body || doc.documentElement;
-      ORIGINAL_BODY = body.cloneNode(true);
+      loadingTask = window.pdfjsLib.getDocument({ url: pdfUrl });
+      pdfDoc = await loadingTask.promise;
 
-      applyPageHeight();
-      syncReaderHeight();
+      updateNavState();
 
-      WR_PAGES = paginateFixed(ORIGINAL_BODY);
-      const restoredIndex = restoreProgress();
-      const maxIndex = Math.max(WR_PAGES.length - 1, 0);
-      const startIndex = Math.min(restoredIndex, maxIndex);
-      CURRENT_PAGE = startIndex;
-      renderPage(startIndex);
+      const stored = parseInt(localStorage.getItem(progressKey) || '1', 10);
+      const startPage = Math.min(Math.max(1, stored), pdfDoc.numPages);
+
+      currentPage = startPage;
+      updatePageInfo();
+
+      requestRender(startPage);
+
+      // Bugfix: initial small render fix
+      setTimeout(() => {
+        if (pdfDoc && currentPage === startPage) {
+          requestRender(startPage);
+        }
+      }, 40);
     } catch (err) {
-      console.error('WRPR load error', err);
-      if (readerContent) {
-        readerContent.innerHTML = `<div class="wr-page"><p>${err.message}</p></div>`;
-      }
-      setPageInfo('Load error');
+      setPageInfo(`PDF load error: ${err.message}`);
+      pdfDoc = null;
       updateNavState();
     }
   }
 
-  function syncReaderHeight() {
-    if (!readerContent || !modalContent) return;
-    const modalMax = Math.min(
-      Math.floor(window.innerHeight * 0.95),
-      PAGE_HEIGHT + WRPR_MODAL_BUFFER
-    );
-    readerContent.style.maxHeight = `${modalMax}px`;
+  // --------------------------------------------------
+  //  BUTTONS
+  // --------------------------------------------------
+  function debounce(fn, wait) {
+    let timer = null, queuedArgs = null;
+
+    return (...args) => {
+      if (!timer) {
+        fn(...args);
+        timer = setTimeout(() => {
+          timer = null;
+          if (queuedArgs) {
+            const latest = queuedArgs;
+            queuedArgs = null;
+            fn(...latest);
+          }
+        }, wait);
+      } else {
+        queuedArgs = args;
+        clearTimeout(timer);
+        timer = setTimeout(() => {
+          timer = null;
+          if (queuedArgs) {
+            const latest = queuedArgs;
+            queuedArgs = null;
+            fn(...latest);
+          }
+        }, wait);
+      }
+    };
   }
 
-  if (btnPrev) {
-    btnPrev.addEventListener('click', () => {
-      if (currentPage > 0) renderPage(currentPage - 1);
-    });
-  }
+  if (btnPrev) bindFastAction(btnPrev, debounce(() => {
+    if (pdfDoc && currentPage > 1) requestRender(currentPage - 1);
+  }, 150));
 
-  if (btnNext) {
-    btnNext.addEventListener('click', () => {
-      if (currentPage < WR_PAGES.length - 1) renderPage(currentPage + 1);
-    });
-  }
+  if (btnNext) bindFastAction(btnNext, debounce(() => {
+    if (pdfDoc && currentPage < pdfDoc.numPages) requestRender(currentPage + 1);
+  }, 150));
 
-  if (btnClose) {
-    btnClose.addEventListener('click', hideModal);
-  }
+  if (btnClose) bindFastAction(btnClose, () => hideModal());
 
-  document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && modal.getAttribute('aria-hidden') === 'false') {
-      hideModal();
-    }
-  });
-
+  // --------------------------------------------------
+  //  WRAPPER BINDING
+  // --------------------------------------------------
   function bindReader(wrapper) {
     const wrapperReaderId = wrapper.dataset.readerId || '';
     const bookCards = [...wrapper.querySelectorAll('.wrpr-book-card')];
@@ -525,10 +507,10 @@ function computePageHeight() {
     wrapper.querySelectorAll('.wrpr-read-btn').forEach((btn) => {
       btn.addEventListener('click', (event) => {
         event.preventDefault();
-        const html = btn.dataset.html || '';
-        if (!html) return;
-        const rid = btn.dataset.reader || wrapperReaderId || 'default';
-        openHTMLReader(html, rid);
+        const pdf = btn.dataset.pdf || '';
+        if (!pdf) return;
+        const rid = btn.dataset.reader || wrapperReaderId;
+        openPDF(pdf, rid);
       });
     });
 
@@ -550,37 +532,160 @@ function computePageHeight() {
 
   document.querySelectorAll('.wrpr-reader-wrapper').forEach((wrapper) => bindReader(wrapper));
 
-  applyPageHeight();
-  syncReaderHeight();
+  // --------------------------------------------------
+  //  TOUCH ENGINE – PINCH + PAN + SWIPE
+  // --------------------------------------------------
+  if (canvasEl && modalContent) {
+    let isPinching = false;
+    let pinchStartDist = 0;
+    let pinchStartZoom = 1;
+
+    let singleTouchActive = false;
+    let touchStartX = 0;
+    let touchStartY = 0;
+    let lastTouchX = 0;
+    let lastTouchY = 0;
+    let totalDeltaX = 0;
+    let totalDeltaY = 0;
+    let swipeConsumed = false;
+
+    function getTouchDistance(e) {
+      if (e.touches.length < 2) return 0;
+      const t1 = e.touches[0];
+      const t2 = e.touches[1];
+      const dx = t1.clientX - t2.clientX;
+      const dy = t1.clientY - t2.clientY;
+      return Math.sqrt(dx * dx + dy * dy);
+    }
+
+    function clampZoom(z) {
+      return Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, z));
+    }
+
+    function handleTouchStart(e) {
+      if (!pdfDoc) return;
+
+      if (e.touches.length === 2) {
+        isPinching = true;
+        singleTouchActive = false;
+        swipeConsumed = true;
+        pinchStartDist = getTouchDistance(e);
+        pinchStartZoom = zoomLevel;
+        e.preventDefault();
+        return;
+      }
+
+      if (e.touches.length === 1) {
+        isPinching = false;
+        singleTouchActive = true;
+        swipeConsumed = false;
+
+        const t = e.touches[0];
+        touchStartX = lastTouchX = t.clientX;
+        touchStartY = lastTouchY = t.clientY;
+        totalDeltaX = 0;
+        totalDeltaY = 0;
+      }
+    }
+
+    function handleTouchMove(e) {
+      if (!pdfDoc) return;
+
+      if (isPinching && e.touches.length >= 2) {
+        const dist = getTouchDistance(e);
+        if (pinchStartDist > 0 && dist > 0) {
+          zoomLevel = clampZoom(pinchStartZoom * (dist / pinchStartDist));
+          applyCanvasTransform();
+        }
+        e.preventDefault();
+        return;
+      }
+
+      if (!singleTouchActive || e.touches.length !== 1) return;
+
+      const t = e.touches[0];
+      const dx = t.clientX - lastTouchX;
+      const dy = t.clientY - lastTouchY;
+      lastTouchX = t.clientX;
+      lastTouchY = t.clientY;
+
+      totalDeltaX = t.clientX - touchStartX;
+      totalDeltaY = t.clientY - touchStartY;
+
+      if (zoomLevel > 1.01) {
+        offsetX += dx;
+        offsetY += dy;
+        applyCanvasTransform();
+        swipeConsumed = true;
+        e.preventDefault();
+      }
+    }
+
+    function handleTouchEnd(e) {
+      if (!pdfDoc) return;
+
+      if (isPinching && e.touches.length < 2) isPinching = false;
+
+      if (!singleTouchActive) return;
+
+      singleTouchActive = false;
+
+      if (zoomLevel > 1.01 || swipeConsumed) return;
+
+      const absX = Math.abs(totalDeltaX);
+      const absY = Math.abs(totalDeltaY);
+      const SWIPE_MIN = 60;
+
+      if (absX > SWIPE_MIN && absX > absY * 1.5) {
+        if (totalDeltaX < 0 && currentPage < pdfDoc.numPages) requestRender(currentPage + 1);
+        else if (totalDeltaX > 0 && currentPage > 1) requestRender(currentPage - 1);
+      }
+    }
+
+    canvasEl.addEventListener('touchstart', handleTouchStart, { passive: false });
+    canvasEl.addEventListener('touchmove', handleTouchMove, { passive: false });
+    canvasEl.addEventListener('touchend', handleTouchEnd, { passive: false });
+    canvasEl.addEventListener('touchcancel', handleTouchEnd, { passive: false });
+
+    // Desktop Ctrl + Wheel zoom
+    canvasEl.addEventListener(
+      'wheel',
+      (e) => {
+        if (!pdfDoc) return;
+        if (!e.ctrlKey) return;
+
+        e.preventDefault();
+        const factor = e.deltaY > 0 ? 0.9 : 1.1;
+        zoomLevel = clampZoom(zoomLevel * factor);
+        applyCanvasTransform();
+      },
+      { passive: false }
+    );
+  }
+
+  // --------------------------------------------------
+  //  RESIZE / ORIENTATION / FULLSCREEN
+  // --------------------------------------------------
+  const handleViewportChange = debounce(() => {
+    if (pdfDoc && canvasEl && currentPage) requestRender(currentPage);
+  }, 120);
 
   window.addEventListener('resize', () => {
-    clearTimeout(resizeTimer);
-    resizeTimer = setTimeout(() => {
-      applyPageHeight();
-      syncReaderHeight();
-
-      if (!MODAL_OPEN || !ORIGINAL_BODY) return;
-
-      const savedPage = CURRENT_PAGE || 0;
-      const pages = paginateFixed(ORIGINAL_BODY);
-      WR_PAGES = pages;
-
-      const maxIndex = Math.max(WR_PAGES.length - 1, 0);
-      const targetIndex = Math.min(Math.max(savedPage, 0), maxIndex);
-      CURRENT_PAGE = targetIndex;
-      renderPage(targetIndex);
-    }, WRPR_RESIZE_DEBOUNCE);
+    markSafeAreaDirty();
+    handleViewportChange();
   });
 
   window.addEventListener('orientationchange', () => {
-    applyPageHeight();
-    syncReaderHeight();
-    if (!MODAL_OPEN || !ORIGINAL_BODY) return;
-    const pages = paginateFixed(ORIGINAL_BODY);
-    WR_PAGES = pages;
-    const maxIndex = Math.max(WR_PAGES.length - 1, 0);
-    const targetIndex = Math.min(Math.max(CURRENT_PAGE, 0), maxIndex);
-    CURRENT_PAGE = targetIndex;
-    renderPage(targetIndex);
+    markSafeAreaDirty();
+    handleViewportChange();
   });
+
+  document.addEventListener('fullscreenchange', () => {
+    markSafeAreaDirty();
+    if (document.fullscreenElement === modal || !document.fullscreenElement) {
+      handleViewportChange();
+    }
+  });
+
+  refreshSafeAreaCache();
 })();
