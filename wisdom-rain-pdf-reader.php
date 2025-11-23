@@ -102,107 +102,24 @@ function wrpr_render_modal_shell() {
     <div id="wrpr-modal" aria-hidden="true" role="dialog" aria-modal="true" aria-label="<?php echo esc_attr__( 'PDF reader', 'wrpr' ); ?>">
         <div id="wrpr-modal-content">
             <button type="button" id="wrpr-close" aria-label="<?php echo esc_attr__( 'Close reader', 'wrpr' ); ?>">&times;</button>
-            <div id="wrpr-lang-menu" class="wrpr-lang-menu notranslate">
-                <button type="button" class="wrpr-lang-current">
-                    <span class="wrpr-lang-flag">
-                        <img src="<?php echo esc_url( WRPR_URL . 'assets/flags/en.svg' ); ?>" alt="English">
-                    </span>
-                    <span class="wrpr-lang-label">English (Original)</span>
-                    <span class="wrpr-lang-caret">▾</span>
-                </button>
-
-                <div class="wrpr-lang-options">
-                    <button type="button" class="wrpr-lang-option" data-lang="en">
-                        <span class="wrpr-lang-flag">
-                            <img src="<?php echo esc_url( WRPR_URL . 'assets/flags/en.svg' ); ?>" alt="">
-                        </span>
-                        <span class="wrpr-lang-text">English (Original)</span>
-                    </button>
-                    <button type="button" class="wrpr-lang-option" data-lang="de">
-                        <span class="wrpr-lang-flag">
-                            <img src="<?php echo esc_url( WRPR_URL . 'assets/flags/de.svg' ); ?>" alt="">
-                        </span>
-                        <span class="wrpr-lang-text">German</span>
-                    </button>
-                    <button type="button" class="wrpr-lang-option" data-lang="fr">
-                        <span class="wrpr-lang-flag">
-                            <img src="<?php echo esc_url( WRPR_URL . 'assets/flags/fr.svg' ); ?>" alt="">
-                        </span>
-                        <span class="wrpr-lang-text">French</span>
-                    </button>
-                    <button type="button" class="wrpr-lang-option" data-lang="it">
-                        <span class="wrpr-lang-flag">
-                            <img src="<?php echo esc_url( WRPR_URL . 'assets/flags/it.svg' ); ?>" alt="">
-                        </span>
-                        <span class="wrpr-lang-text">Italian</span>
-                    </button>
-                    <button type="button" class="wrpr-lang-option" data-lang="pt">
-                        <span class="wrpr-lang-flag">
-                            <img src="<?php echo esc_url( WRPR_URL . 'assets/flags/pt.svg' ); ?>" alt="">
-                        </span>
-                        <span class="wrpr-lang-text">Portuguese</span>
-                    </button>
-                    <button type="button" class="wrpr-lang-option" data-lang="tr">
-                        <span class="wrpr-lang-flag">
-                            <img src="<?php echo esc_url( WRPR_URL . 'assets/flags/tr.svg' ); ?>" alt="">
-                        </span>
-                        <span class="wrpr-lang-text">Turkish</span>
-                    </button>
-                    <button type="button" class="wrpr-lang-option" data-lang="ru">
-                        <span class="wrpr-lang-flag">
-                            <img src="<?php echo esc_url( WRPR_URL . 'assets/flags/ru.svg' ); ?>" alt="">
-                        </span>
-                        <span class="wrpr-lang-text">Russian</span>
-                    </button>
-                    <button type="button" class="wrpr-lang-option" data-lang="es">
-                        <span class="wrpr-lang-flag">
-                            <img src="<?php echo esc_url( WRPR_URL . 'assets/flags/es.svg' ); ?>" alt="">
-                        </span>
-                        <span class="wrpr-lang-text">Spanish</span>
-                    </button>
-                    <button type="button" class="wrpr-lang-option" data-lang="hi">
-                        <span class="wrpr-lang-flag">
-                            <img src="<?php echo esc_url( WRPR_URL . 'assets/flags/hi.svg' ); ?>" alt="">
-                        </span>
-                        <span class="wrpr-lang-text">Hindi</span>
-                    </button>
-                    <button type="button" class="wrpr-lang-option" data-lang="ja">
-                        <span class="wrpr-lang-flag">
-                            <img src="<?php echo esc_url( WRPR_URL . 'assets/flags/ja.svg' ); ?>" alt="">
-                        </span>
-                        <span class="wrpr-lang-text">Japanese</span>
-                    </button>
-                    <button type="button" class="wrpr-lang-option" data-lang="zh-cn">
-                        <span class="wrpr-lang-flag">
-                            <img src="<?php echo esc_url( WRPR_URL . 'assets/flags/zh-cn.svg' ); ?>" alt="">
-                        </span>
-                        <span class="wrpr-lang-text">Chinese (Simplified)</span>
-                    </button>
-                    <button type="button" class="wrpr-lang-option" data-lang="no">
-                        <span class="wrpr-lang-flag">
-                            <img src="<?php echo esc_url( WRPR_URL . 'assets/flags/no.svg' ); ?>" alt="">
-                        </span>
-                        <span class="wrpr-lang-text">Norwegian</span>
-                    </button>
-                    <button type="button" class="wrpr-lang-option" data-lang="ar">
-                        <span class="wrpr-lang-flag">
-                            <img src="<?php echo esc_url( WRPR_URL . 'assets/flags/ar.svg' ); ?>" alt="">
-                        </span>
-                        <span class="wrpr-lang-text">Arabic</span>
-                    </button>
-                    <button type="button" class="wrpr-lang-option" data-lang="nl">
-                        <span class="wrpr-lang-flag">
-                            <img src="<?php echo esc_url( WRPR_URL . 'assets/flags/nl.svg' ); ?>" alt="">
-                        </span>
-                        <span class="wrpr-lang-text">Dutch</span>
-                    </button>
-                    <button type="button" class="wrpr-lang-option" data-lang="pl">
-                        <span class="wrpr-lang-flag">
-                            <img src="<?php echo esc_url( WRPR_URL . 'assets/flags/pl.svg' ); ?>" alt="">
-                        </span>
-                        <span class="wrpr-lang-text">Polish</span>
-                    </button>
-                </div>
+            <div id="wrpr-translate-bar">
+               <select id="wrpr-lang-select">
+                  <option value="en">English (Original)</option>
+                  <option value="de">German</option>
+                  <option value="fr">French</option>
+                  <option value="it">Italian</option>
+                  <option value="pt">Portuguese</option>
+                  <option value="tr">Turkish</option>
+                  <option value="ru">Russian</option>
+                  <option value="es">Spanish</option>
+                  <option value="hi">Hindi</option>
+                  <option value="ja">Japanese</option>
+                  <option value="zh-CN">Chinese (Simplified)</option>
+                  <option value="no">Norwegian</option>
+                  <option value="ar">Arabic</option>
+                  <option value="nl">Dutch</option>
+                  <option value="pl">Polish</option>
+               </select>
             </div>
             <div id="wrpr-reader-content" class="wrpr-reader-content"></div>
             <div class="wrpr-page-info"><?php echo esc_html__( 'Page 1', 'wrpr' ); ?></div>
