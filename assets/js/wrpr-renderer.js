@@ -341,6 +341,8 @@ function computePageHeight() {
     modal.style.display = 'flex';
     modal.setAttribute('aria-hidden', 'false');
     document.body.classList.add('wrpr-modal-open');
+    document.documentElement.classList.add('wrpr-reader-open');
+    document.body.classList.add('wrpr-reader-open');
     MODAL_OPEN = true;
   }
 
@@ -357,6 +359,8 @@ function computePageHeight() {
     modal.style.display = 'none';
     modal.setAttribute('aria-hidden', 'true');
     document.body.classList.remove('wrpr-modal-open');
+    document.documentElement.classList.remove('wrpr-reader-open');
+    document.body.classList.remove('wrpr-reader-open');
     MODAL_OPEN = false;
     clearReader();
     setPageInfo('Page 1 / 1');
